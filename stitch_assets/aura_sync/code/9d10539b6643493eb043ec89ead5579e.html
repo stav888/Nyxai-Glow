@@ -1,0 +1,247 @@
+<!DOCTYPE html><html class="dark" lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "surface-container": "#201f1f", "surface-container-lowest": "#0e0e0e", "on-error": "#690005", "inverse-surface": "#e5e2e1", "on-primary-fixed": "#3e0502", "on-surface-variant": "#dac1bd", "primary-fixed": "#ffdad5", "on-surface": "#e5e2e1", "secondary": "#c2c7ce", "on-tertiary": "#00382c", "surface-container-highest": "#353534", "on-tertiary-fixed": "#002019", "on-secondary": "#2b3136", "secondary-container": "#444a4f", "secondary-fixed-dim": "#c2c7ce", "surface-container-low": "#1c1b1b", "on-error-container": "#ffdad6", "outline": "#a28c88", "primary-fixed-dim": "#ffb4a8", "on-secondary-fixed": "#171c21", "on-primary-container": "#783026", "on-tertiary-container": "#005141", "surface-dim": "#131313", "on-secondary-fixed-variant": "#42474d", "inverse-primary": "#96463b", "on-background": "#e5e2e1", "on-primary": "#5b1a12", "tertiary-fixed": "#90f5d7", "on-tertiary-fixed-variant": "#005141", "inverse-on-surface": "#313030", "error": "#ffb4ab", "tertiary-fixed-dim": "#74d8bc", "error-container": "#93000a", "secondary-fixed": "#dee3ea", "background": "#131313", "surface-bright": "#393939", "on-primary-fixed-variant": "#783026", "surface-container-high": "#2a2a2a", "primary": "#ffc2b9", "surface-variant": "#353534", "primary-container": "#ff9a8b", "tertiary-container": "#62c7ab", "tertiary": "#7fe3c6", "outline-variant": "#544340", "surface": "#131313", "on-secondary-container": "#b4b9c0", "surface-tint": "#ffb4a8" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-md": "1rem", "space-xs": "0.25rem", "margin-mobile": "1rem", "gutter": "1rem", "space-xl": "2rem", "margin": "1.5rem", "space-sm": "0.5rem", "gutter-mobile": "0.75rem", "space-lg": "1.5rem" }, fontFamily: { "headline-lg-mobile": ["Inter"], "headline-lg": ["Inter"], "body-lg": ["Inter"], "label-lg": ["Inter"], "body-sm": ["Inter"], "display": ["Inter"], "label-md": ["Inter"], "body-md": ["Inter"], "headline-md": ["Inter"], "label-sm": ["Inter"], "headline-sm": ["Inter"] }, fontSize: { "headline-lg-mobile": ["26px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "label-lg": ["14px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "600" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "400" }], "display": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.03em", "fontWeight": "600" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }], "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }], "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.015em", "fontWeight": "500" }], "label-sm": ["10px", { "lineHeight": "12px", "letterSpacing": "0.04em", "fontWeight": "600" }], "headline-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "500" }] } } } };</script></head><body class="bg-surface text-on-surface font-body-md text-body-md pt-safe pb-safe flex flex-col min-h-screen selection:bg-primary selection:text-on-primary"><main class="flex flex-col relative w-full bg-surface min-h-screen"><div class="flex flex-col w-full relative overflow-hidden select-none">
+<!-- Dynamic Ambient Glow Gradients -->
+<div class="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary-container/20 rounded-full blur-3xl pointer-events-none transition-all duration-700 ease-out" id="ambient-glow"></div>
+<div class="absolute top-1/3 -right-20 w-64 h-64 bg-secondary/10 rounded-full blur-3xl pointer-events-none"></div>
+<!-- Top Glass Header Ribbon -->
+<div class="w-full px-margin-mobile pt-space-md flex items-center justify-between z-10">
+<div class="flex items-center gap-space-xs px-space-sm py-1 rounded-full bg-surface-container/70 backdrop-blur-md">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-sm text-label-sm tracking-wider uppercase text-on-surface-variant font-medium">Neural Engine 3.2</span>
+</div>
+<button class="px-space-md py-1.5 rounded-full bg-surface-container-high/60 backdrop-blur-md text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" id="skip-btn">
+      Skip
+    </button>
+</div>
+<!-- Main Swiper Showcase -->
+<div class="relative w-full px-margin-mobile pt-space-lg pb-space-sm flex flex-col items-center z-10">
+<!-- Brand Visual Stage -->
+<div class="relative w-full max-w-xs aspect-square flex items-center justify-center my-space-md">
+<!-- Concentric Orbital Halos -->
+<div class="absolute inset-0 rounded-full bg-surface-container-low/60 backdrop-blur-xl flex items-center justify-center">
+<div class="w-64 h-64 rounded-full border-0 bg-gradient-to-tr from-primary/10 via-surface-container-highest/20 to-secondary/15 animate-[spin_12s_linear_infinite]"></div>
+</div>
+<div class="absolute w-52 h-52 rounded-full bg-primary-container/15 blur-2xl animate-pulse"></div>
+<!-- Center Logo Container -->
+<div class="relative z-10 flex flex-col items-center justify-center">
+<div class="relative w-36 h-36 flex items-center justify-center">
+<img alt="Nyxai-Glow Emblem" class="w-full h-full object-contain filter drop-shadow-[0_0_24px_rgba(255,154,139,0.55)] transition-transform duration-500 transform hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSiMISHQr5mo4tJJbLkoAguYrO0S9vDMkMh25pHDDYv9UIouWBxEgQSz5uiUhVlBuILG7UcIp80IXL2gcn20UuLreooRRHnvx-PXEabgoTpfjNOvZzt0ePmc-Le3k8w931eBCfRDnBOW3TziSqLuf-yecsGK5trOgF3HugJbsCfGvcmgwkDm0hQD871TM5-6LPMYzvaPbkCIPgsxtrUuV2S3_35kFHmv6g8nyMpGG_slWn5qcFY2X5">
+</div>
+</div>
+<!-- Realtime Spec Pointers Floating Badges -->
+<div class="absolute top-2 left-0 px-space-sm py-1 rounded-full bg-surface-container-highest/80 backdrop-blur-xl shadow-lg flex items-center gap-1.5 transition-all duration-500" id="badge-top-left">
+<span class="material-symbols-outlined text-primary text-[14px]">auto_awesome</span>
+<span class="font-label-sm text-label-sm text-on-surface">Subsurface Scatter</span>
+</div>
+<div class="absolute bottom-3 right-0 px-space-sm py-1 rounded-full bg-surface-container-highest/80 backdrop-blur-xl shadow-lg flex items-center gap-1.5 transition-all duration-500" id="badge-bottom-right">
+<span class="material-symbols-outlined text-tertiary text-[14px]">light_mode</span>
+<span class="font-label-sm text-label-sm text-on-surface">RAW Depth Map</span>
+</div>
+</div>
+<!-- Editorial Slide Content Carousel -->
+<div class="w-full mt-space-md min-h-[170px] relative overflow-hidden flex flex-col justify-center text-center">
+<!-- Slide 1 -->
+<div class="slide-content transition-all duration-500 flex flex-col items-center hidden opacity-0 translate-y-4" id="slide-0">
+<div class="inline-flex items-center gap-1.5 mb-space-xs px-3 py-1 rounded-full bg-primary-container/20 text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-xs">lte_mobiledata</span>
+<span class="">AUTHENTIC AI RETOUCH</span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface tracking-tight max-w-xs font-semibold">
+          Adaptive Glow: <br><span class="text-primary-container">Perfect light,</span> anywhere.
+        </h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 max-w-xs leading-relaxed">
+          Subtle biological illumination calibrated for real golden-hour warmth in any low-light scene.
+        </p>
+</div>
+<!-- Slide 2 -->
+<div class="slide-content transition-all duration-500 flex flex-col items-center absolute inset-0 opacity-100 translate-y-0" id="slide-1">
+<div class="inline-flex items-center gap-1.5 mb-space-xs px-3 py-1 rounded-full bg-tertiary-container/20 text-tertiary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-xs">grain</span>
+<span class="">HIGH-FIDELITY DERMA</span>
+</div>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface tracking-tight max-w-xs font-semibold">
+          Texture Preserve: <br><span class="text-tertiary">Real skin,</span> real you.
+        </h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 max-w-xs leading-relaxed">
+          Say goodbye to blurry plastic filters. Advanced high-pass micro-texture keeps every freckle intact.
+        </p>
+</div>
+<!-- Slide 3 -->
+<div class="slide-content transition-all duration-500 flex flex-col items-center absolute inset-0 hidden opacity-0 translate-y-4" id="slide-2">
+<div class="inline-flex items-center gap-1.5 mb-space-xs px-3 py-1 rounded-full bg-secondary-container/40 text-secondary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-xs">tune</span>
+<span class="">TACTILE PRECISION</span>
+</div>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface tracking-tight max-w-xs font-semibold">
+          Haptic Retouch: <br><span class="text-on-surface">Micro-control</span> at touch.
+        </h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 max-w-xs leading-relaxed">
+          Fluid split-frame inspection with ultra-fine haptic slider physics designed for studio creators.
+        </p>
+</div>
+</div>
+</div>
+<!-- Interactive Demo Micro-Card -->
+<div class="w-full px-margin-mobile my-space-sm z-10">
+<div class="w-full p-space-md rounded-xl bg-surface-container/70 backdrop-blur-xl flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined">flare</span>
+</div>
+<div class="flex flex-col text-left">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Aura Intensity</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant" id="intensity-val">85% Skin Clarity</span>
+</div>
+</div>
+<!-- Mini Touch Slider Visual -->
+<div class="w-28 flex items-center">
+<div class="relative w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary-container rounded-full" id="slider-progress" style="width: 85%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Navigation, Pagination Dots & Primary CTA -->
+<div class="w-full px-margin-mobile pt-space-md pb-space-lg flex flex-col items-center gap-space-lg z-10">
+<!-- Minimalist Pagination Indicator Dots -->
+<div class="flex items-center gap-2">
+<button aria-label="Slide 1" class="dot-btn h-2 rounded-full transition-all duration-300 w-2 bg-surface-container-highest" id="dot-0" onclick="goToSlide(0)"></button>
+<button aria-label="Slide 2" class="dot-btn h-2 rounded-full transition-all duration-300 w-7 bg-primary-container shadow-[0_0_10px_rgba(255,154,139,0.6)]" id="dot-1" onclick="goToSlide(1)"></button>
+<button aria-label="Slide 3" class="dot-btn h-2 rounded-full transition-all duration-300 w-2 bg-surface-container-highest" id="dot-2" onclick="goToSlide(2)"></button>
+</div>
+<!-- Action Section -->
+<div class="w-full flex flex-col items-center gap-space-sm">
+<button class="w-full py-4 rounded-full bg-gradient-to-r from-primary-container via-primary to-primary-fixed text-on-primary-container font-label-lg text-label-lg font-bold uppercase tracking-wider shadow-[0_4px_24px_rgba(255,154,139,0.38)] active:scale-[0.98] transition-all flex items-center justify-center gap-2" id="primary-cta">
+<span id="cta-label" class="">Continue</span>
+<span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+<!-- Subtext Guarantee -->
+<div class="flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-xs text-tertiary">check_circle</span>
+<span class="">Zero cloud upload. On-device neural processing.</span>
+</div>
+</div>
+</div>
+</div>
+<script>
+  (function () {
+    let currentSlide = 0;
+    const totalSlides = 3;
+    const slides = [
+      document.getElementById('slide-0'),
+      document.getElementById('slide-1'),
+      document.getElementById('slide-2')
+    ];
+    const dots = [
+      document.getElementById('dot-0'),
+      document.getElementById('dot-1'),
+      document.getElementById('dot-2')
+    ];
+    const glow = document.getElementById('ambient-glow');
+    const badgeLeft = document.getElementById('badge-top-left');
+    const badgeRight = document.getElementById('badge-bottom-right');
+    const sliderProgress = document.getElementById('slider-progress');
+    const intensityVal = document.getElementById('intensity-val');
+    const ctaBtn = document.getElementById('primary-cta');
+    const ctaLabel = document.getElementById('cta-label');
+
+    const meta = [
+      {
+        glow: 'bg-primary-container/20',
+        bLeft: 'Pore Retention 99.4%',
+        bRight: '3D Micro-Glow',
+        slider: '68%',
+        sliderLabel: '68% Natural Bloom',
+        cta: 'Start Glowing'
+      },
+      {
+        glow: 'bg-tertiary/20',
+        bLeft: 'Subsurface Scatter',
+        bRight: 'RAW Depth Map',
+        slider: '85%',
+        sliderLabel: '85% Skin Clarity',
+        cta: 'Continue'
+      },
+      {
+        glow: 'bg-secondary/20',
+        bLeft: 'Zero Latency Sync',
+        bRight: 'Pro Color Profiles',
+        slider: '100%',
+        sliderLabel: 'Calibrated DCI-P3',
+        cta: 'Launch AuraSync'
+      }
+    ];
+
+    window.goToSlide = function(idx) {
+      if (idx === currentSlide) return;
+
+      // Hide active slide
+      slides[currentSlide].classList.add('hidden', 'opacity-0', 'translate-y-4');
+      slides[currentSlide].classList.remove('opacity-100', 'translate-y-0');
+
+      dots[currentSlide].classList.remove('w-7', 'bg-primary-container', 'shadow-[0_0_10px_rgba(255,154,139,0.6)]');
+      dots[currentSlide].classList.add('w-2', 'bg-surface-container-highest');
+
+      // Update index
+      currentSlide = idx;
+
+      // Show target slide
+      slides[currentSlide].classList.remove('hidden');
+      setTimeout(() => {
+        slides[currentSlide].classList.remove('opacity-0', 'translate-y-4');
+        slides[currentSlide].classList.add('opacity-100', 'translate-y-0');
+      }, 20);
+
+      dots[currentSlide].classList.add('w-7', 'bg-primary-container', 'shadow-[0_0_10px_rgba(255,154,139,0.6)]');
+      dots[currentSlide].classList.remove('w-2', 'bg-surface-container-highest');
+
+      // Update contextual micro-card & badges
+      const currentMeta = meta[currentSlide];
+      badgeLeft.querySelector('span:last-child').textContent = currentMeta.bLeft;
+      badgeRight.querySelector('span:last-child').textContent = currentMeta.bRight;
+      sliderProgress.style.width = currentMeta.slider;
+      intensityVal.textContent = currentMeta.sliderLabel;
+      ctaLabel.textContent = currentMeta.cta;
+
+      // Subtle pulse feedback
+      badgeLeft.classList.add('scale-105');
+      badgeRight.classList.add('scale-105');
+      setTimeout(() => {
+        badgeLeft.classList.remove('scale-105');
+        badgeRight.classList.remove('scale-105');
+      }, 250);
+    };
+
+    ctaBtn.addEventListener('click', () => {
+      if (currentSlide < totalSlides - 1) {
+        goToSlide(currentSlide + 1);
+      } else {
+        // Final splash completion feedback
+        ctaBtn.classList.add('scale-95');
+        setTimeout(() => {
+          ctaBtn.classList.remove('scale-95');
+          ctaLabel.textContent = 'Welcome to AuraSync';
+        }, 150);
+      }
+    });
+
+    document.getElementById('skip-btn').addEventListener('click', () => {
+      goToSlide(totalSlides - 1);
+    });
+
+    // Gentle automatic slide advance if idle
+    let timer = setInterval(() => {
+      let next = (currentSlide + 1) % totalSlides;
+      goToSlide(next);
+    }, 4500);
+
+    // Reset timer upon explicit user tap
+    [ctaBtn, ...dots].forEach(elem => {
+      elem.addEventListener('pointerdown', () => {
+        clearInterval(timer);
+      });
+    });
+  })();
+</script></main>
+
+</body></html>
