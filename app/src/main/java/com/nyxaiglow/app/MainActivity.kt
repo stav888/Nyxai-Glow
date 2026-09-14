@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -201,7 +202,7 @@ private fun GlowStudio() {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Ink.copy(alpha = .78f), Color.Transparent, Ink.copy(alpha = .96f)))))
             Column(Modifier.fillMaxSize().padding(WindowInsets.navigationBars.asPaddingValues()), verticalArrangement = Arrangement.SpaceBetween) {
                 TopBar(flashOn, flashAvailable, { flashOn = !flashOn }, { showSettings = true }, activeTab)
-                Column(Modifier.fillMaxWidth().padding(bottom = 78.dp)) {
+                Column(Modifier.fillMaxWidth().padding(bottom = 126.dp)) {
                     CameraOverlay(glow, ambient, preserveTexture, reticleVisible) { preserveTexture = !preserveTexture }
                     CameraDeck(
                         preset = preset,
@@ -435,7 +436,7 @@ private fun RetouchTool(label: String, icon: androidx.compose.ui.graphics.vector
 
 @Composable
 private fun BottomNavigation(active: String, onChange: (String) -> Unit) {
-    Surface(color = SurfaceDark.copy(alpha = .98f), shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = SurfaceDark.copy(alpha = .98f), shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
             NavItem("Gallery", Icons.Default.PhotoLibrary, active, onChange)
             NavItem("Looks", Icons.Default.AutoAwesome, active, onChange)
