@@ -24,40 +24,13 @@ class FaceLandmarkAnalyzer(
     private val onError: (String) -> Unit = {}
 ) : ImageAnalysis.Analyzer {
     private var lastFaceFrameTime = 0L
-    private val faceLandmarker: FaceLandmarker? = try {
-        val baseOptions = BaseOptions.builder()
-            .setModelAssetPath(MODEL_NAME)
-            .setDelegate(Delegate.GPU)
-            .build()
-        FaceLandmarker.createFromOptions(
-            context,
-            FaceLandmarker.FaceLandmarkerOptions.builder()
-                .setBaseOptions(baseOptions)
-                .setRunningMode(RunningMode.LIVE_STREAM)
-                .setNumFaces(1)
-                .setMinFaceDetectionConfidence(0.5f)
-                .setMinTrackingConfidence(0.5f)
-                .setResultListener { result, _ -> onLandmarksDetected(result) }
-                .setErrorListener { error -> onError(error.message ?: "Face landmarking unavailable") }
-                .build()
-        )
-    } catch (exception: Exception) {
-        onError(exception.message ?: "Face landmark model unavailable")
-        null
-    }
+    private val faceLandmarker: FaceLandmarker? = createFaceLandmarker(context, onLandmarksDetected, onError)
 
     @SuppressLint("UnsafeOptInUsageError")
     override fun analyze(image: ImageProxy) {
-        val landmarker = faceLandmarker
-        if (landmarker == null) {
-            image.close()
-            return
-        }
-        if (image.image == null) {
-            image.close()
-            return
-        }
         try {
+            val landmarker = faceLandmarker ?: return
+            if (image.image == null) return
             val luminancePlane = image.planes.firstOrNull()?.buffer?.duplicate()
             if (luminancePlane != null && luminancePlane.hasRemaining()) {
                 val sampleCount = minOf(120, luminancePlane.remaining())
@@ -81,7 +54,6 @@ class FaceLandmarkAnalyzer(
                 .setRotationDegrees(image.imageInfo.rotationDegrees)
                 .build()
             landmarker.detectAsync(mpImage, processingOptions, now)
-            bitmap.recycle()
         } catch (exception: Exception) {
             onError(exception.message ?: "Face landmarking failed")
         } finally {
@@ -131,4 +103,37 @@ private fun ImageProxy.toRgbaBitmap(): android.graphics.Bitmap? {
     val jpeg = java.io.ByteArrayOutputStream()
     if (!yuvImage.compressToJpeg(Rect(0, 0, width, height), 85, jpeg)) return null
     return BitmapFactory.decodeByteArray(jpeg.toByteArray(), 0, jpeg.size())
+}
+
+private fun createFaceLandmarker(
+    context: Context,
+    onLandmarksDetected: (FaceLandmarkerResult) -> Unit,
+    onError: (String) -> Unit
+): FaceLandmarker? {
+    fun options(delegate: Delegate): FaceLandmarker.FaceLandmarkerOptions =
+        FaceLandmarker.FaceLandmarkerOptions.builder()
+            .setBaseOptions(
+                BaseOptions.builder()
+                    .setModelAssetPath("face_landmarker.task")
+                    .setDelegate(delegate)
+                    .build()
+            )
+            .setRunningMode(RunningMode.LIVE_STREAM)
+            .setNumFaces(1)
+            .setMinFaceDetectionConfidence(0.5f)
+            .setMinTrackingConfidence(0.5f)
+            .setResultListener { result, _ -> onLandmarksDetected(result) }
+            .setErrorListener { error -> onError(error.message ?: "Face landmarking unavailable") }
+            .build()
+
+    return try {
+        FaceLandmarker.createFromOptions(context, options(Delegate.GPU))
+    } catch (gpuException: Exception) {
+        try {
+            FaceLandmarker.createFromOptions(context, options(Delegate.CPU))
+        } catch (cpuException: Exception) {
+            onError(cpuException.message ?: gpuException.message ?: "Face landmark model unavailable")
+            null
+        }
+    }
 }

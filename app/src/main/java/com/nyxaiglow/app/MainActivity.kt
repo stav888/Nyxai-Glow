@@ -88,6 +88,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nyxaiglow.app.camera.FaceLandmarkAnalyzer
 import com.nyxaiglow.app.camera.lightingState
 import com.nyxaiglow.app.ui.theme.NyxaiGlowTheme
+import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.delay
@@ -108,21 +109,15 @@ class MainActivity : ComponentActivity() {
 private fun NyxaiGlowApp() {
     val context = LocalContext.current
     var cameraGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
-    val needsStoragePermission = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
-    var storageGranted by remember {
-        mutableStateOf(!needsStoragePermission || ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
-    }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
         cameraGranted = results[Manifest.permission.CAMERA] == true || ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        storageGranted = !needsStoragePermission || results[Manifest.permission.WRITE_EXTERNAL_STORAGE] == true || ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
     }
-    if (cameraGranted && storageGranted) {
+    if (cameraGranted) {
         GlowStudio()
     } else {
         PermissionPrompt {
             val permissions = buildList {
                 if (!cameraGranted) add(Manifest.permission.CAMERA)
-                if (needsStoragePermission && !storageGranted) add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             }
             permissionLauncher.launch(permissions.toTypedArray())
         }
@@ -131,9 +126,10 @@ private fun NyxaiGlowApp() {
 
 @Composable
 private fun GlowStudio() {
+    val context = LocalContext.current
     var glow by remember { mutableFloatStateOf(0.68f) }
     var ambient by remember { mutableFloatStateOf(0.58f) }
-    var preset by remember { mutableStateOf("Natural") }
+    var preset by remember { mutableStateOf("Soft") }
     var zoom by remember { mutableStateOf("1x") }
     var facing by remember { mutableStateOf(CameraSelector.LENS_FACING_FRONT) }
     var flashOn by remember { mutableStateOf(false) }
@@ -146,6 +142,23 @@ private fun GlowStudio() {
     var statusMessage by remember { mutableStateOf("Ready") }
     var showSettings by remember { mutableStateOf(false) }
     var flashAvailable by remember { mutableStateOf(false) }
+    val legacyStorageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            captureRequest++
+        } else {
+            captureLock.set(false)
+            statusMessage = "Storage permission is required to save photos"
+        }
+    }
+    fun requestCapture() {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            legacyStorageLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            captureRequest++
+        }
+    }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             capturedUri = uri
@@ -162,6 +175,9 @@ private fun GlowStudio() {
     Box(Modifier.fillMaxSize().background(Mist)) {
         CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest,
             onAmbient = { ambient = it },
+            onLandmarksDetected = { result ->
+                if (result.faceLandmarks().isNotEmpty()) statusMessage = "Face detected"
+            },
             onCapture = { uri ->
                 captureLock.set(false)
                 capturedUri = uri
@@ -191,7 +207,7 @@ private fun GlowStudio() {
                     onZoom = { zoom = it },
                     onFlip = { facing = if (facing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT },
                     onGallery = { galleryLauncher.launch("image/*") },
-                    onCapture = { if (captureLock.compareAndSet(false, true)) captureRequest++ }
+                    onCapture = { if (captureLock.compareAndSet(false, true)) requestCapture() }
                 )
                 BottomNavigation(activeTab) { tab ->
                     activeTab = tab
@@ -386,6 +402,7 @@ private fun CameraPreview(
     flashOn: Boolean,
     captureRequest: Int,
     onAmbient: (Float) -> Unit,
+    onLandmarksDetected: (FaceLandmarkerResult) -> Unit,
     onCapture: (Uri) -> Unit,
     onCameraError: (String) -> Unit,
     onFlashAvailabilityChanged: (Boolean) -> Unit
@@ -403,11 +420,16 @@ private fun CameraPreview(
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
             if (disposed) return@addListener
-            val provider = future.get()
+            val provider = try {
+                future.get()
+            } catch (exception: Exception) {
+                onCameraError("Camera initialization failed: ${exception.message ?: exception.javaClass.simpleName}")
+                return@addListener
+            }
             val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
             faceAnalyzer = FaceLandmarkAnalyzer(
                 context = context,
-                onLandmarksDetected = { },
+                onLandmarksDetected = onLandmarksDetected,
                 onLightChanged = onAmbient,
                 onError = onCameraError
             )
@@ -426,6 +448,7 @@ private fun CameraPreview(
         onDispose {
             disposed = true
             camera = null
+            onFlashAvailabilityChanged(false)
             faceAnalyzer?.close()
             faceAnalyzer = null
         }
