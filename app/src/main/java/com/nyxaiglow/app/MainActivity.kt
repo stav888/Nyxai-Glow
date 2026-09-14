@@ -86,8 +86,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nyxaiglow.app.camera.AmbientLightAnalyzer
+import com.nyxaiglow.app.camera.FaceLandmarkAnalyzer
 import com.nyxaiglow.app.ui.theme.NyxaiGlowTheme
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.delay
 
 private val Coral = Color(0xFFFF9A8B)
@@ -107,7 +109,6 @@ private fun NyxaiGlowApp() {
     val context = LocalContext.current
     var cameraGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { cameraGranted = it }
-    LaunchedEffect(Unit) { if (!cameraGranted) permissionLauncher.launch(Manifest.permission.CAMERA) }
     if (cameraGranted) GlowStudio() else PermissionPrompt { permissionLauncher.launch(Manifest.permission.CAMERA) }
 }
 
@@ -123,6 +124,7 @@ private fun GlowStudio() {
     var preserveTexture by remember { mutableStateOf(true) }
     var reticleVisible by remember { mutableStateOf(true) }
     var captureRequest by remember { mutableStateOf(0) }
+    val captureLock = remember { AtomicBoolean(false) }
     var capturedUri by remember { mutableStateOf<Uri?>(null) }
     var statusMessage by remember { mutableStateOf("Ready") }
     var showSettings by remember { mutableStateOf(false) }
@@ -143,10 +145,14 @@ private fun GlowStudio() {
         CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest,
             onAmbient = { ambient = it },
             onCapture = { uri ->
+                captureLock.set(false)
                 capturedUri = uri
                 statusMessage = "Photo captured"
             },
-            onCameraError = { statusMessage = it }
+            onCameraError = {
+                captureLock.set(false)
+                statusMessage = it
+            }
         )
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Ink.copy(alpha = .68f), Color.Transparent, Ink.copy(alpha = .88f)))))
         Column(Modifier.fillMaxSize().padding(WindowInsets.navigationBars.asPaddingValues()), verticalArrangement = Arrangement.SpaceBetween) {
@@ -163,7 +169,7 @@ private fun GlowStudio() {
                     onZoom = { zoom = it },
                     onFlip = { facing = if (facing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT },
                     onGallery = { galleryLauncher.launch("image/*") },
-                    onCapture = { captureRequest++ }
+                    onCapture = { if (captureLock.compareAndSet(false, true)) captureRequest++ }
                 )
                 BottomNavigation(activeTab) { tab ->
                     activeTab = tab
@@ -377,6 +383,7 @@ private fun CameraPreview(
     val previewView = remember { PreviewView(context) }
     val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
     var camera by remember { mutableStateOf<Camera?>(null) }
+    var faceAnalyzer: FaceLandmarkAnalyzer? = null
 
     DisposableEffect(lensFacing) {
         val future = ProcessCameraProvider.getInstance(context)
@@ -384,10 +391,12 @@ private fun CameraPreview(
             val provider = future.get()
             val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
             val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also { it.setAnalyzer(executor, AmbientLightAnalyzer(onAmbient)) }
+            faceAnalyzer = FaceLandmarkAnalyzer(context, onLandmarksDetected = { })
+            val faceAnalysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also { it.setAnalyzer(executor, faceAnalyzer!!) }
             val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
             provider.unbindAll()
             camera = try {
-                provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, analysis)
+                provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, analysis, faceAnalysis)
             } catch (_: Exception) {
                 onCameraError("Camera unavailable")
                 null
@@ -395,8 +404,13 @@ private fun CameraPreview(
         }, ContextCompat.getMainExecutor(context))
         onDispose {
             camera = null
-            executor.shutdown()
+            faceAnalyzer?.close()
+            faceAnalyzer = null
         }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { executor.shutdown() }
     }
 
     LaunchedEffect(camera, zoom, flashOn) {
@@ -413,6 +427,10 @@ private fun CameraPreview(
                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Nyxai Glow")
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            onCameraError("Saving photos requires Android 10+ on this device configuration")
+            return@LaunchedEffect
         }
         val outputUri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
         if (outputUri == null) {

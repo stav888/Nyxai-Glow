@@ -3,7 +3,6 @@ package com.nyxaiglow.app.camera
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import kotlin.math.max
-import kotlin.math.min
 
 class AmbientLightAnalyzer(
     private val onLightChanged: (Float) -> Unit
@@ -24,17 +23,17 @@ class AmbientLightAnalyzer(
             return
         }
 
+        val bytes = ByteArray(buffer.remaining())
+        buffer.get(bytes)
         var sum = 0L
+        val step = max(1, bytes.size / 120)
         var samples = 0
-        val step = max(1, buffer.remaining() / 120)
-        var index = buffer.position()
-        while (index < buffer.limit()) {
-            sum += buffer.get(index).toInt() and 0xFF
+        for (index in bytes.indices step step) {
+            sum += bytes[index].toInt() and 0xFF
             samples++
-            index += step
         }
         val luminance = if (samples == 0) 0.5f else (sum.toFloat() / samples / 255f)
-        onLightChanged(min(1f, max(0f, luminance)))
+        onLightChanged(luminance.coerceIn(0f, 1f))
         image.close()
     }
 
