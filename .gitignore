@@ -5,6 +5,7 @@
 .DS_Store
 /build
 /app/build
+/.vscode/mcp.json
 /captures
 .externalNativeBuild
 .cxx

@@ -8,7 +8,16 @@ import kotlin.math.min
 class AmbientLightAnalyzer(
     private val onLightChanged: (Float) -> Unit
 ) : ImageAnalysis.Analyzer {
+    private var lastSampleTime = 0L
+
     override fun analyze(image: ImageProxy) {
+        val now = System.currentTimeMillis()
+        if (now - lastSampleTime < SAMPLE_INTERVAL_MS) {
+            image.close()
+            return
+        }
+        lastSampleTime = now
+
         val buffer = image.planes.firstOrNull()?.buffer
         if (buffer == null || !buffer.hasRemaining()) {
             image.close()
@@ -27,5 +36,9 @@ class AmbientLightAnalyzer(
         val luminance = if (samples == 0) 0.5f else (sum.toFloat() / samples / 255f)
         onLightChanged(min(1f, max(0f, luminance)))
         image.close()
+    }
+
+    private companion object {
+        const val SAMPLE_INTERVAL_MS = 250L
     }
 }
