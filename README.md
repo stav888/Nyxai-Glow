@@ -9,6 +9,7 @@ Nyxai Glow is a native Android camera studio built with Kotlin, Jetpack Compose,
 - MediaPipe Face Landmarker runs in live-stream mode, with GPU initialization and CPU fallback.
 - CameraX YUV frames are converted to RGBA bitmaps because the tested device rejects direct YUV MediaImages.
 - Android 10+ uses scoped MediaStore storage. Android 8/9 requests legacy storage only when the shutter is pressed.
+- The main Compose surface follows the downloaded AuraSync Stitch direction with a dark viewfinder, coral controls, and a functional Retouch dashboard.
 - Presets and the texture toggle currently update the interface and reticle state. They do not yet apply a real beauty filter, TFLite smoothing model, or GPU shader to preview pixels.
 
 ## Requirements

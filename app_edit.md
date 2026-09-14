@@ -17,6 +17,8 @@ The current implementation provides:
 - Android photo picker access.
 - MediaPipe Face Landmarker initialization and live landmark callbacks.
 - Settings/status feedback surfaces.
+- Stitch-inspired dark AuraSync viewfinder styling with AI Active and 4K RAW status capsules.
+- Stitch-inspired Retouch dashboard with tool categories, preset strip, smoothing control, micro-texture toggle, reset, and apply actions.
 
 The current implementation does not yet apply a real beauty filter, TFLite smoothing model, or OpenGL Adaptive Glow effect to the camera pixels. Presets and texture preservation currently affect the UI state and reticle presentation only.
 
@@ -185,18 +187,18 @@ The live studio is a full-screen layered Compose layout:
 5. The texture control appears below the reticle.
 6. Preset and zoom controls appear above the capture row.
 7. Gallery, shutter, and flip controls form the capture row.
-8. A light bottom navigation surface contains Gallery, Looks, Camera, and Profile.
+8. A dark bottom navigation surface contains Gallery, Looks, Camera, and Profile.
 
 ### Visual design system
 
 - Coral: `#FF9A8B`
 - Deep coral: `#96463B`
-- Mist: `#FAF8FF`
-- Ink: `#171B2B`
+- Mist: `#F5F1F0`
+- Ink: `#111111`
 - Muted gray: `#595F65`
 - White: `#FFFFFF`
 
-The UI uses dark translucent camera overlays, coral selected states, rounded pills, a circular shutter action, and a light bottom navigation panel.
+The UI uses dark translucent camera overlays, coral selected states, rounded pills, a circular shutter action, and a dark bottom navigation panel. The live feed remains CameraX-backed; downloaded Stitch screenshots are design references, not the camera background.
 
 ### Icon alignment and touch targets
 
@@ -347,6 +349,10 @@ The shutter uses CameraX `ImageCapture` and MediaStore:
 - Failed captures delete the pending URI and report an error.
 - An atomic capture lock prevents overlapping double-tap requests.
 
+### Retouch dashboard
+
+The Retouch tab is a functional Compose surface reachable from the Looks item in bottom navigation. It exposes Skin, Shape, Light, and Makeup tool categories, Smooth/Freckles/Matte/Dewy/Refine preset choices, a smoothing-intensity control, the micro-texture toggle, Reset, and Apply & Save feedback. These controls currently update UI state and status only; they do not yet modify image pixels.
+
 ### Flip camera
 
 The flip icon swaps front and rear lens selectors. CameraX is unbound and rebound through the guarded lifecycle effect.
@@ -354,7 +360,7 @@ The flip icon swaps front and rear lens selectors. CameraX is unbound and reboun
 ### Bottom navigation
 
 - Gallery opens the image picker.
-- Looks reports that presets can be selected above.
+- Looks opens the Retouch dashboard.
 - Camera returns to the camera tab state.
 - Profile opens the settings dialog.
 

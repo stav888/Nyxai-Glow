@@ -55,6 +55,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -95,8 +96,10 @@ import kotlinx.coroutines.delay
 
 private val Coral = Color(0xFFFF9A8B)
 private val CoralDeep = Color(0xFF96463B)
-private val Mist = Color(0xFFFAF8FF)
-private val Ink = Color(0xFF171B2B)
+private val Mist = Color(0xFFF5F1F0)
+private val Ink = Color(0xFF111111)
+private val SurfaceDark = Color(0xFF171515)
+private val SurfaceRaised = Color(0xFF242020)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -172,50 +175,56 @@ private fun GlowStudio() {
         reticleVisible = false
     }
 
-    Box(Modifier.fillMaxSize().background(Mist)) {
-        CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest,
-            onAmbient = { ambient = it },
-            onLandmarksDetected = { result ->
-                if (result.faceLandmarks().isNotEmpty()) statusMessage = "Face detected"
-            },
-            onCapture = { uri ->
-                captureLock.set(false)
-                capturedUri = uri
-                statusMessage = "Photo captured"
-            },
-            onCameraError = {
-                captureLock.set(false)
-                statusMessage = it
-            },
-            onFlashAvailabilityChanged = {
-                flashAvailable = it
-                if (!it) flashOn = false
+    Box(Modifier.fillMaxSize().background(Ink)) {
+        if (activeTab == "Retouch") {
+            RetouchDashboard(preserveTexture, { preserveTexture = !preserveTexture }, { statusMessage = "Retouch saved" })
+        } else {
+            CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest,
+                onAmbient = { ambient = it },
+                onLandmarksDetected = { result ->
+                    if (result.faceLandmarks().isNotEmpty()) statusMessage = "Face detected"
+                },
+                onCapture = { uri ->
+                    captureLock.set(false)
+                    capturedUri = uri
+                    statusMessage = "Photo captured"
+                },
+                onCameraError = {
+                    captureLock.set(false)
+                    statusMessage = it
+                },
+                onFlashAvailabilityChanged = {
+                    flashAvailable = it
+                    if (!it) flashOn = false
+                }
+            )
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Ink.copy(alpha = .78f), Color.Transparent, Ink.copy(alpha = .96f)))))
+            Column(Modifier.fillMaxSize().padding(WindowInsets.navigationBars.asPaddingValues()), verticalArrangement = Arrangement.SpaceBetween) {
+                TopBar(flashOn, flashAvailable, { flashOn = !flashOn }, { showSettings = true }, activeTab)
+                Column(Modifier.fillMaxWidth().padding(bottom = 78.dp)) {
+                    CameraOverlay(glow, ambient, preserveTexture, reticleVisible) { preserveTexture = !preserveTexture }
+                    CameraDeck(
+                        preset = preset,
+                        zoom = zoom,
+                        onPreset = { chosen ->
+                            preset = chosen
+                            glow = when (chosen) { "Radiant" -> .86f; "Velvet" -> .34f; "Defined" -> .57f; else -> .68f }
+                        },
+                        onZoom = { zoom = it },
+                        onFlip = { facing = if (facing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT },
+                        onGallery = { galleryLauncher.launch("image/*") },
+                        onCapture = { if (captureLock.compareAndSet(false, true)) requestCapture() }
+                    )
+                }
             }
-        )
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Ink.copy(alpha = .68f), Color.Transparent, Ink.copy(alpha = .88f)))))
-        Column(Modifier.fillMaxSize().padding(WindowInsets.navigationBars.asPaddingValues()), verticalArrangement = Arrangement.SpaceBetween) {
-            TopBar(flashOn, flashAvailable, { flashOn = !flashOn }, { showSettings = true })
-            Column(Modifier.fillMaxWidth()) {
-                CameraOverlay(glow, ambient, preserveTexture, reticleVisible) { preserveTexture = !preserveTexture }
-                CameraDeck(
-                    preset = preset,
-                    zoom = zoom,
-                    onPreset = { chosen ->
-                        preset = chosen
-                        glow = when (chosen) { "Radiant" -> .86f; "Velvet" -> .34f; "Defined" -> .57f; else -> .68f }
-                    },
-                    onZoom = { zoom = it },
-                    onFlip = { facing = if (facing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT },
-                    onGallery = { galleryLauncher.launch("image/*") },
-                    onCapture = { if (captureLock.compareAndSet(false, true)) requestCapture() }
-                )
-                BottomNavigation(activeTab) { tab ->
-                    activeTab = tab
-                    when (tab) {
-                        "Gallery" -> galleryLauncher.launch("image/*")
-                        "Looks" -> statusMessage = "Choose a look above"
-                        "Profile" -> showSettings = true
-                    }
+        }
+        Box(Modifier.align(Alignment.BottomCenter)) {
+            BottomNavigation(activeTab) { tab ->
+                activeTab = tab
+                when (tab) {
+                    "Gallery" -> galleryLauncher.launch("image/*")
+                    "Looks" -> activeTab = "Retouch"
+                    "Profile" -> showSettings = true
                 }
             }
         }
@@ -241,15 +250,15 @@ private fun GlowStudio() {
 }
 
 @Composable
-private fun TopBar(flashOn: Boolean, flashAvailable: Boolean, onFlash: () -> Unit, onSettings: () -> Unit) {
+private fun TopBar(flashOn: Boolean, flashAvailable: Boolean, onFlash: () -> Unit, onSettings: () -> Unit, activeTab: String) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AuraLogo(Modifier.size(34.dp))
             Spacer(Modifier.width(9.dp))
-            Text("Nyxai Glow", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text("NYXAI-GLOW", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Camera", color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
+            Text(if (activeTab == "Retouch") "Retouch Looks" else "Camera", color = Color.White.copy(alpha = .82f), fontSize = 11.sp)
             IconButton(onClick = onFlash, enabled = flashAvailable) { Icon(Icons.Default.FlashOn, "Toggle flash", tint = if (flashOn) Coral else Color.White.copy(alpha = if (flashAvailable) .75f else .3f)) }
             IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Camera settings", tint = Color.White.copy(alpha = .75f)) }
         }
@@ -259,19 +268,19 @@ private fun TopBar(flashOn: Boolean, flashAvailable: Boolean, onFlash: () -> Uni
 @Composable
 private fun CameraOverlay(glow: Float, ambient: Float, preserveTexture: Boolean, reticleVisible: Boolean, onTextureToggle: () -> Unit) {
     Box(Modifier.fillMaxWidth().height(350.dp)) {
-        Surface(color = Ink.copy(alpha = .44f), shape = RoundedCornerShape(50), modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp)) {
+        Surface(color = Ink.copy(alpha = .68f), shape = RoundedCornerShape(50), modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp)) {
             Row(Modifier.padding(horizontal = 13.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(Coral))
                 Spacer(Modifier.width(7.dp))
-                Text("Glow Engine", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text("AI ACTIVE", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.sp)
                 Spacer(Modifier.width(8.dp))
-                Text("Ready", color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
+                Text("4K RAW", color = Coral, fontSize = 10.sp, fontWeight = FontWeight.Medium)
             }
         }
         if (reticleVisible) {
             GlowReticle(Modifier.align(Alignment.Center), glow, ambient)
         }
-        Surface(color = Ink.copy(alpha = .52f), shape = RoundedCornerShape(50), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp)) {
+        Surface(color = Ink.copy(alpha = .72f), shape = RoundedCornerShape(50), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp)) {
             Row(
                 Modifier
                     .clickable(onClick = onTextureToggle)
@@ -350,8 +359,83 @@ private fun CameraDeck(preset: String, zoom: String, onPreset: (String) -> Unit,
 }
 
 @Composable
+private fun RetouchDashboard(preserveTexture: Boolean, onTextureToggle: () -> Unit, onApply: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(SurfaceDark)
+            .padding(start = 16.dp, top = 72.dp, end = 16.dp, bottom = 104.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("AI CORE V2.4 ACTIVE", color = Color.White.copy(alpha = .78f), fontSize = 10.sp, letterSpacing = 1.sp)
+                Surface(color = SurfaceRaised, shape = RoundedCornerShape(50)) {
+                    Text("HOLD BEFORE", color = Color.White, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Surface(color = Color.Black.copy(alpha = .34f), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().height(310.dp)) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    GlowReticle(Modifier.size(172.dp), .72f, .62f)
+                    Text("98.4% NATURAL MATCH", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.TopCenter).padding(top = 18.dp))
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                RetouchTool("Skin", Icons.Default.AutoAwesome, true)
+                RetouchTool("Shape", Icons.Default.PhotoLibrary, false)
+                RetouchTool("Light", Icons.Default.FlashOn, false)
+                RetouchTool("Makeup", Icons.Default.Palette, false)
+            }
+            Spacer(Modifier.height(18.dp))
+            Text("PRESETS & TONE", color = Color.White.copy(alpha = .64f), fontSize = 10.sp, letterSpacing = 1.sp)
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(listOf("Smooth", "Freckles", "Matte", "Dewy", "Refine")) { item ->
+                    Surface(color = if (item == "Smooth") Coral else SurfaceRaised, shape = RoundedCornerShape(10.dp)) {
+                        Column(Modifier.width(58.dp).padding(7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(if (item == "Smooth") CoralDeep else Color(0xFF3B3331)))
+                            Spacer(Modifier.height(5.dp))
+                            Text(item, color = if (item == "Smooth") CoralDeep else Color.White, fontSize = 9.sp)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Text("Smoothing intensity", color = Color.White, fontSize = 12.sp)
+            Slider(value = if (preserveTexture) .45f else .72f, onValueChange = {}, valueRange = 0f..1f, colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Coral, activeTrackColor = Coral, inactiveTrackColor = SurfaceRaised))
+            Surface(color = SurfaceRaised, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onTextureToggle)) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("Subtle Micro-Texture", color = Color.White, fontSize = 12.sp)
+                        Text("Preserves natural pores & grain", color = Color.White.copy(alpha = .58f), fontSize = 10.sp)
+                    }
+                    Text(if (preserveTexture) "ON" else "OFF", color = if (preserveTexture) Coral else Color.White.copy(alpha = .5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = {}, colors = ButtonDefaults.buttonColors(containerColor = SurfaceRaised, contentColor = Color.White), modifier = Modifier.weight(1f)) { Text("RESET", fontSize = 11.sp) }
+            Button(onClick = onApply, colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = CoralDeep), modifier = Modifier.weight(2f)) { Text("APPLY & SAVE", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+        }
+    }
+}
+
+@Composable
+private fun RetouchTool(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(color = if (selected) Coral.copy(alpha = .2f) else SurfaceRaised, shape = CircleShape, modifier = Modifier.size(42.dp)) {
+            Icon(icon, label, tint = if (selected) Coral else Color.White.copy(alpha = .72f), modifier = Modifier.padding(12.dp))
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(label, color = if (selected) Coral else Color.White.copy(alpha = .7f), fontSize = 10.sp)
+    }
+}
+
+@Composable
 private fun BottomNavigation(active: String, onChange: (String) -> Unit) {
-    Surface(color = Mist.copy(alpha = .95f), shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = SurfaceDark.copy(alpha = .98f), shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
             NavItem("Gallery", Icons.Default.PhotoLibrary, active, onChange)
             NavItem("Looks", Icons.Default.AutoAwesome, active, onChange)
@@ -365,8 +449,8 @@ private fun BottomNavigation(active: String, onChange: (String) -> Unit) {
 private fun NavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, active: String, onChange: (String) -> Unit) {
     val selected = label == active
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onChange(label) }.padding(horizontal = 7.dp, vertical = 3.dp)) {
-        Icon(icon, label, tint = if (selected) CoralDeep else Color(0xFF595F65), modifier = Modifier.size(21.dp))
-        Text(label, color = if (selected) CoralDeep else Color(0xFF595F65), fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        Icon(icon, label, tint = if (selected) Coral else Color.White.copy(alpha = .58f), modifier = Modifier.size(21.dp))
+        Text(label, color = if (selected) Coral else Color.White.copy(alpha = .58f), fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
 
