@@ -1,14 +1,21 @@
 package com.nyxaiglow.app
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.os.Build
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.Camera
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -49,6 +56,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +65,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -113,6 +122,16 @@ private fun GlowStudio() {
     var activeTab by remember { mutableStateOf("Camera") }
     var preserveTexture by remember { mutableStateOf(true) }
     var reticleVisible by remember { mutableStateOf(true) }
+    var captureRequest by remember { mutableStateOf(0) }
+    var capturedUri by remember { mutableStateOf<Uri?>(null) }
+    var statusMessage by remember { mutableStateOf("Ready") }
+    var showSettings by remember { mutableStateOf(false) }
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            capturedUri = uri
+            statusMessage = "Photo selected"
+        }
+    }
 
     LaunchedEffect(preset, zoom, flashOn, facing) {
         reticleVisible = true
@@ -121,24 +140,64 @@ private fun GlowStudio() {
     }
 
     Box(Modifier.fillMaxSize().background(Mist)) {
-        CameraPreview(Modifier.fillMaxSize(), facing) { ambient = it }
+        CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest,
+            onAmbient = { ambient = it },
+            onCapture = { uri ->
+                capturedUri = uri
+                statusMessage = "Photo captured"
+            },
+            onCameraError = { statusMessage = it }
+        )
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Ink.copy(alpha = .68f), Color.Transparent, Ink.copy(alpha = .88f)))))
         Column(Modifier.fillMaxSize().padding(WindowInsets.navigationBars.asPaddingValues()), verticalArrangement = Arrangement.SpaceBetween) {
-            TopBar(flashOn, { flashOn = !flashOn })
+            TopBar(flashOn, { flashOn = !flashOn }, { showSettings = true })
             Column(Modifier.fillMaxWidth()) {
                 CameraOverlay(glow, ambient, preserveTexture, reticleVisible) { preserveTexture = !preserveTexture }
-                CameraDeck(preset, zoom, { chosen ->
-                    preset = chosen
-                    glow = when (chosen) { "Radiant" -> .86f; "Velvet" -> .34f; "Defined" -> .57f; else -> .68f }
-                }, { zoom = it }) { facing = if (facing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT }
-                BottomNavigation(activeTab) { activeTab = it }
+                CameraDeck(
+                    preset = preset,
+                    zoom = zoom,
+                    onPreset = { chosen ->
+                        preset = chosen
+                        glow = when (chosen) { "Radiant" -> .86f; "Velvet" -> .34f; "Defined" -> .57f; else -> .68f }
+                    },
+                    onZoom = { zoom = it },
+                    onFlip = { facing = if (facing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT },
+                    onGallery = { galleryLauncher.launch("image/*") },
+                    onCapture = { captureRequest++ }
+                )
+                BottomNavigation(activeTab) { tab ->
+                    activeTab = tab
+                    when (tab) {
+                        "Gallery" -> galleryLauncher.launch("image/*")
+                        "Looks" -> statusMessage = "Choose a look above"
+                        "Profile" -> showSettings = true
+                    }
+                }
+            }
+        }
+        if (statusMessage != "Ready") {
+            Surface(color = Ink.copy(alpha = .82f), shape = RoundedCornerShape(50), modifier = Modifier.align(Alignment.TopCenter).padding(top = 70.dp)) {
+                Text(statusMessage, color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+            }
+        }
+        if (showSettings) {
+            Dialog(onDismissRequest = { showSettings = false }) {
+                Surface(color = Mist, shape = RoundedCornerShape(24.dp)) {
+                    Column(Modifier.padding(22.dp)) {
+                        Text("Camera settings", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(12.dp))
+                        Text("Texture preservation is ${if (preserveTexture) "on" else "off"}.", color = Color(0xFF595F65), fontSize = 14.sp)
+                        Text("Flash and zoom follow the connected camera hardware.", color = Color(0xFF595F65), fontSize = 14.sp)
+                        TextButton(onClick = { showSettings = false }) { Text("Done", color = CoralDeep) }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun TopBar(flashOn: Boolean, onFlash: () -> Unit) {
+private fun TopBar(flashOn: Boolean, onFlash: () -> Unit, onSettings: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AuraLogo(Modifier.size(34.dp))
@@ -148,7 +207,7 @@ private fun TopBar(flashOn: Boolean, onFlash: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Camera", color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
             IconButton(onClick = onFlash) { Icon(Icons.Default.FlashOn, "Toggle flash", tint = if (flashOn) Coral else Color.White.copy(alpha = .75f)) }
-            IconButton(onClick = { }) { Icon(Icons.Default.Settings, "Camera settings", tint = Color.White.copy(alpha = .75f)) }
+            IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Camera settings", tint = Color.White.copy(alpha = .75f)) }
         }
     }
 }
@@ -220,7 +279,7 @@ private fun lightingState(ambient: Float): String = when {
 }
 
 @Composable
-private fun CameraDeck(preset: String, zoom: String, onPreset: (String) -> Unit, onZoom: (String) -> Unit, onFlip: () -> Unit) {
+private fun CameraDeck(preset: String, zoom: String, onPreset: (String) -> Unit, onZoom: (String) -> Unit, onFlip: () -> Unit, onGallery: () -> Unit, onCapture: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             items(listOf("Soft", "Radiant", "Velvet", "Defined")) { item ->
@@ -245,10 +304,10 @@ private fun CameraDeck(preset: String, zoom: String, onPreset: (String) -> Unit,
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { }) { Icon(Icons.Default.PhotoLibrary, "Open gallery", tint = Color.White.copy(alpha = .86f), modifier = Modifier.size(26.dp)) }
+            IconButton(onClick = onGallery) { Icon(Icons.Default.PhotoLibrary, "Open gallery", tint = Color.White.copy(alpha = .86f), modifier = Modifier.size(26.dp)) }
             Box(contentAlignment = Alignment.Center) {
                 Box(Modifier.size(84.dp).clip(CircleShape).background(Coral.copy(alpha = .22f)))
-                Surface(color = Color.White.copy(alpha = .94f), shape = CircleShape, modifier = Modifier.size(70.dp)) { IconButton(onClick = { }) { Icon(Icons.Default.Camera, "Capture photo", tint = CoralDeep, modifier = Modifier.size(30.dp)) } }
+                Surface(color = Color.White.copy(alpha = .94f), shape = CircleShape, modifier = Modifier.size(70.dp)) { IconButton(onClick = onCapture) { Icon(Icons.Default.Camera, "Capture photo", tint = CoralDeep, modifier = Modifier.size(30.dp)) } }
             }
             IconButton(onClick = onFlip) { Icon(Icons.Default.FlipCameraAndroid, "Flip camera", tint = Color.White.copy(alpha = .86f), modifier = Modifier.size(27.dp)) }
         }
@@ -302,21 +361,79 @@ private fun PermissionPrompt(onRequest: () -> Unit) {
 }
 
 @Composable
-private fun CameraPreview(modifier: Modifier, lensFacing: Int, onAmbient: (Float) -> Unit) {
+private fun CameraPreview(
+    modifier: Modifier,
+    lensFacing: Int,
+    zoom: String,
+    flashOn: Boolean,
+    captureRequest: Int,
+    onAmbient: (Float) -> Unit,
+    onCapture: (Uri) -> Unit,
+    onCameraError: (String) -> Unit
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
     val previewView = remember { PreviewView(context) }
+    val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
+    var camera by remember { mutableStateOf<Camera?>(null) }
+
     DisposableEffect(lensFacing) {
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
             val provider = future.get()
             val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
             val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also { it.setAnalyzer(executor, AmbientLightAnalyzer(onAmbient)) }
+            val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
             provider.unbindAll()
-            provider.bindToLifecycle(lifecycleOwner, CameraSelector.Builder().requireLensFacing(lensFacing).build(), preview, analysis)
+            camera = try {
+                provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, analysis)
+            } catch (_: Exception) {
+                onCameraError("Camera unavailable")
+                null
+            }
         }, ContextCompat.getMainExecutor(context))
-        onDispose { executor.shutdown() }
+        onDispose {
+            camera = null
+            executor.shutdown()
+        }
     }
+
+    LaunchedEffect(camera, zoom, flashOn) {
+        camera?.cameraControl?.setZoomRatio(zoom.removeSuffix("x").toFloatOrNull() ?: 1f)
+        camera?.cameraControl?.enableTorch(flashOn)
+    }
+
+    LaunchedEffect(captureRequest) {
+        if (captureRequest == 0) return@LaunchedEffect
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "NyxaiGlow_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Nyxai Glow")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+        }
+        val outputUri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+        if (outputUri == null) {
+            onCameraError("Could not prepare photo storage")
+            return@LaunchedEffect
+        }
+        val output = ImageCapture.OutputFileOptions.Builder(context.contentResolver, outputUri, values).build()
+        imageCapture.takePicture(output, executor, object : ImageCapture.OnImageSavedCallback {
+            override fun onImageSaved(result: ImageCapture.OutputFileResults) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    context.contentResolver.update(outputUri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
+                }
+                onCapture(outputUri)
+            }
+
+            override fun onError(exception: ImageCaptureException) {
+                context.contentResolver.delete(outputUri, null, null)
+                onCameraError("Capture failed")
+            }
+        })
+    }
+
     AndroidView(factory = { previewView }, modifier = modifier)
 }
