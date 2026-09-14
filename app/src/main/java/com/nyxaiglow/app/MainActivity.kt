@@ -85,8 +85,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.nyxaiglow.app.camera.AmbientLightAnalyzer
 import com.nyxaiglow.app.camera.FaceLandmarkAnalyzer
+import com.nyxaiglow.app.camera.lightingState
 import com.nyxaiglow.app.ui.theme.NyxaiGlowTheme
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -108,8 +108,25 @@ class MainActivity : ComponentActivity() {
 private fun NyxaiGlowApp() {
     val context = LocalContext.current
     var cameraGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { cameraGranted = it }
-    if (cameraGranted) GlowStudio() else PermissionPrompt { permissionLauncher.launch(Manifest.permission.CAMERA) }
+    val needsStoragePermission = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
+    var storageGranted by remember {
+        mutableStateOf(!needsStoragePermission || ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+        cameraGranted = results[Manifest.permission.CAMERA] == true || ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        storageGranted = !needsStoragePermission || results[Manifest.permission.WRITE_EXTERNAL_STORAGE] == true || ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+    }
+    if (cameraGranted && storageGranted) {
+        GlowStudio()
+    } else {
+        PermissionPrompt {
+            val permissions = buildList {
+                if (!cameraGranted) add(Manifest.permission.CAMERA)
+                if (needsStoragePermission && !storageGranted) add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+            permissionLauncher.launch(permissions.toTypedArray())
+        }
+    }
 }
 
 @Composable
@@ -128,6 +145,7 @@ private fun GlowStudio() {
     var capturedUri by remember { mutableStateOf<Uri?>(null) }
     var statusMessage by remember { mutableStateOf("Ready") }
     var showSettings by remember { mutableStateOf(false) }
+    var flashAvailable by remember { mutableStateOf(false) }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             capturedUri = uri
@@ -152,11 +170,15 @@ private fun GlowStudio() {
             onCameraError = {
                 captureLock.set(false)
                 statusMessage = it
+            },
+            onFlashAvailabilityChanged = {
+                flashAvailable = it
+                if (!it) flashOn = false
             }
         )
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Ink.copy(alpha = .68f), Color.Transparent, Ink.copy(alpha = .88f)))))
         Column(Modifier.fillMaxSize().padding(WindowInsets.navigationBars.asPaddingValues()), verticalArrangement = Arrangement.SpaceBetween) {
-            TopBar(flashOn, { flashOn = !flashOn }, { showSettings = true })
+            TopBar(flashOn, flashAvailable, { flashOn = !flashOn }, { showSettings = true })
             Column(Modifier.fillMaxWidth()) {
                 CameraOverlay(glow, ambient, preserveTexture, reticleVisible) { preserveTexture = !preserveTexture }
                 CameraDeck(
@@ -203,7 +225,7 @@ private fun GlowStudio() {
 }
 
 @Composable
-private fun TopBar(flashOn: Boolean, onFlash: () -> Unit, onSettings: () -> Unit) {
+private fun TopBar(flashOn: Boolean, flashAvailable: Boolean, onFlash: () -> Unit, onSettings: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AuraLogo(Modifier.size(34.dp))
@@ -212,7 +234,7 @@ private fun TopBar(flashOn: Boolean, onFlash: () -> Unit, onSettings: () -> Unit
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Camera", color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
-            IconButton(onClick = onFlash) { Icon(Icons.Default.FlashOn, "Toggle flash", tint = if (flashOn) Coral else Color.White.copy(alpha = .75f)) }
+            IconButton(onClick = onFlash, enabled = flashAvailable) { Icon(Icons.Default.FlashOn, "Toggle flash", tint = if (flashOn) Coral else Color.White.copy(alpha = if (flashAvailable) .75f else .3f)) }
             IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Camera settings", tint = Color.White.copy(alpha = .75f)) }
         }
     }
@@ -230,11 +252,8 @@ private fun CameraOverlay(glow: Float, ambient: Float, preserveTexture: Boolean,
                 Text("Ready", color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
             }
         }
-        androidx.compose.animation.AnimatedVisibility(
-            visible = reticleVisible,
-            modifier = Modifier.align(Alignment.Center)
-        ) {
-            GlowReticle(Modifier, glow, ambient)
+        if (reticleVisible) {
+            GlowReticle(Modifier.align(Alignment.Center), glow, ambient)
         }
         Surface(color = Ink.copy(alpha = .52f), shape = RoundedCornerShape(50), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp)) {
             Row(
@@ -275,13 +294,6 @@ private fun GlowReticle(modifier: Modifier, progress: Float, ambient: Float) {
             Text(lightingState(ambient), color = Color.White.copy(alpha = .82f), fontSize = 12.sp)
         }
     }
-}
-
-private fun lightingState(ambient: Float): String = when {
-    ambient < .2f -> "Low light - glow boosted"
-    ambient < .6f -> "Balanced light"
-    ambient < .85f -> "Bright - highlights softened"
-    else -> "Harsh light - smoothing adjusted"
 }
 
 @Composable
@@ -375,7 +387,8 @@ private fun CameraPreview(
     captureRequest: Int,
     onAmbient: (Float) -> Unit,
     onCapture: (Uri) -> Unit,
-    onCameraError: (String) -> Unit
+    onCameraError: (String) -> Unit,
+    onFlashAvailabilityChanged: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -386,23 +399,32 @@ private fun CameraPreview(
     var faceAnalyzer: FaceLandmarkAnalyzer? = null
 
     DisposableEffect(lensFacing) {
+        var disposed = false
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
+            if (disposed) return@addListener
             val provider = future.get()
             val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
-            val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also { it.setAnalyzer(executor, AmbientLightAnalyzer(onAmbient)) }
-            faceAnalyzer = FaceLandmarkAnalyzer(context, onLandmarksDetected = { })
-            val faceAnalysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also { it.setAnalyzer(executor, faceAnalyzer!!) }
+            faceAnalyzer = FaceLandmarkAnalyzer(
+                context = context,
+                onLandmarksDetected = { },
+                onLightChanged = onAmbient,
+                onError = onCameraError
+            )
+            val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also { it.setAnalyzer(executor, faceAnalyzer!!) }
             val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
             provider.unbindAll()
             camera = try {
-                provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, analysis, faceAnalysis)
-            } catch (_: Exception) {
-                onCameraError("Camera unavailable")
+                provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, analysis).also {
+                    onFlashAvailabilityChanged(it.cameraInfo.hasFlashUnit())
+                }
+            } catch (exception: Exception) {
+                onCameraError("Camera unavailable: ${exception.javaClass.simpleName}")
                 null
             }
         }, ContextCompat.getMainExecutor(context))
         onDispose {
+            disposed = true
             camera = null
             faceAnalyzer?.close()
             faceAnalyzer = null
@@ -414,8 +436,15 @@ private fun CameraPreview(
     }
 
     LaunchedEffect(camera, zoom, flashOn) {
-        camera?.cameraControl?.setZoomRatio(zoom.removeSuffix("x").toFloatOrNull() ?: 1f)
-        camera?.cameraControl?.enableTorch(flashOn)
+        val currentCamera = camera ?: return@LaunchedEffect
+        val requestedZoom = zoom.removeSuffix("x").toFloatOrNull() ?: 1f
+        val zoomState = currentCamera.cameraInfo.zoomState.value
+        if (zoomState != null) {
+            currentCamera.cameraControl.setZoomRatio(requestedZoom.coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio))
+        }
+        if (currentCamera.cameraInfo.hasFlashUnit()) {
+            currentCamera.cameraControl.enableTorch(flashOn)
+        }
     }
 
     LaunchedEffect(captureRequest) {
@@ -428,8 +457,10 @@ private fun CameraPreview(
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
         }
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            onCameraError("Saving photos requires Android 10+ on this device configuration")
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            onCameraError("Storage permission is required to save photos")
             return@LaunchedEffect
         }
         val outputUri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
