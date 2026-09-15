@@ -1,6 +1,7 @@
 package com.nyxaiglow.app.camera
 
 import android.content.Context
+import android.os.Build
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import android.os.SystemClock
@@ -85,6 +86,11 @@ private fun createFaceLandmarker(
     onError: (String) -> Unit,
     processingFrame: AtomicBoolean
 ): FaceLandmarker? {
+    if (Build.SUPPORTED_ABIS.firstOrNull() != "arm64-v8a") {
+        onError("Face landmarking is unavailable on this device")
+        return null
+    }
+
     fun options(delegate: Delegate): FaceLandmarker.FaceLandmarkerOptions =
         FaceLandmarker.FaceLandmarkerOptions.builder()
             .setBaseOptions(
