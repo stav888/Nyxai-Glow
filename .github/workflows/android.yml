@@ -19,6 +19,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - name: Set up Android SDK
+        id: android_sdk
         uses: android-actions/setup-android@v3
         with:
           packages: >-
@@ -36,9 +37,17 @@ jobs:
             gradle-${{ runner.os }}-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-      - name: Build and test
-        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
-      - name: Assemble release (unsigned)
+      - name: Run unit tests
+        if: steps.android_sdk.outcome == 'success'
+        run: ./gradlew --no-daemon testDebugUnitTest
+      - name: Run lint
+        if: steps.android_sdk.outcome == 'success'
+        run: ./gradlew --no-daemon lintDebug
+      - name: Assemble debug APK
+        if: steps.android_sdk.outcome == 'success'
+        run: ./gradlew --no-daemon assembleDebug
+      - name: Assemble release APK
+        if: steps.android_sdk.outcome == 'success'
         run: ./gradlew --no-daemon assembleRelease
       - name: Upload test reports
         if: always()
@@ -58,3 +67,9 @@ jobs:
         with:
           name: lint-reports
           path: app/build/reports/lint-results-*.html
+      - name: Upload release APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: app/build/outputs/apk/release/*.apk

@@ -21,7 +21,7 @@ import kotlin.math.max
 
 class FaceLandmarkAnalyzer(
     context: Context,
-    private val onLandmarksDetected: (FaceLandmarkerResult) -> Unit,
+    private val onLandmarksDetected: (FaceLandmarkerResult, Int) -> Unit,
     private val onLightChanged: (Float) -> Unit,
     private val onError: (String) -> Unit = {}
 ) : ImageAnalysis.Analyzer {
@@ -29,6 +29,8 @@ class FaceLandmarkAnalyzer(
     private var lastLightSampleTime = 0L
     private val bitmapLock = Any()
     private var inFlightBitmap: Bitmap? = null
+    @Volatile
+    private var lastRotationDegrees = 0
     private val closed = AtomicBoolean(false)
     private val faceLandmarker: FaceLandmarker? = createFaceLandmarker(
         context,
@@ -50,6 +52,7 @@ class FaceLandmarkAnalyzer(
             }
             lastFaceFrameTime = now
             val bitmap = image.toRgbaBitmap() ?: return
+            lastRotationDegrees = image.imageInfo.rotationDegrees
             synchronized(bitmapLock) {
                 if (inFlightBitmap != null) {
                     bitmap.recycle()
@@ -158,7 +161,7 @@ private fun ImageProxy.toRgbaBitmap(): android.graphics.Bitmap? {
 
 private fun createFaceLandmarker(
     context: Context,
-    onLandmarksDetected: (FaceLandmarkerResult) -> Unit,
+    onLandmarksDetected: (FaceLandmarkerResult, Int) -> Unit,
     onError: (String) -> Unit,
     onFrameCompleted: () -> Unit
 ): FaceLandmarker? {
@@ -176,7 +179,7 @@ private fun createFaceLandmarker(
             .setMinTrackingConfidence(0.5f)
             .setResultListener { result, _ ->
                 onFrameCompleted()
-                onLandmarksDetected(result)
+                onLandmarksDetected(result, lastRotationDegrees)
             }
             .setErrorListener { error ->
                 onFrameCompleted()

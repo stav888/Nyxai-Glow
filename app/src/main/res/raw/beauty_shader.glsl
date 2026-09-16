@@ -8,6 +8,9 @@ uniform float uSmoothStrength;
 uniform vec2 uTexelSize;
 varying vec2 vTextureCoord;
 
+// TODO: Add a dedicated skin channel when the mask generator exposes one.
+// Keep smoothing face-limited without guessing which existing makeup channel is skin.
+
 void main() {
     vec4 color = texture2D(uTexture, vTextureCoord);
     vec4 mask = texture2D(uMakeupMask, vTextureCoord);
@@ -21,7 +24,8 @@ void main() {
     smoothColor += texture2D(uTexture, vTextureCoord + vec2(-offset.x, offset.y)).rgb;
     smoothColor += texture2D(uTexture, vTextureCoord + vec2(0.0, offset.y)).rgb;
     smoothColor += texture2D(uTexture, vTextureCoord + vec2(offset.x, offset.y)).rgb;
-    vec3 finalColor = mix(color.rgb, smoothColor / 12.0, uSmoothStrength * 0.28);
+    float makeupCoverage = smoothstep(0.02, 0.25, max(mask.r, mask.g));
+    vec3 finalColor = mix(color.rgb, smoothColor / 12.0, uSmoothStrength * 0.28 * makeupCoverage);
 
     vec3 warmTone = vec3(1.0, 0.985, 0.96);
     finalColor *= mix(vec3(1.0), warmTone, 0.12 * uGlowStrength);

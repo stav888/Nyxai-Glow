@@ -90,6 +90,8 @@ import com.nyxaiglow.app.camera.BeautyCameraRenderer
 import com.nyxaiglow.app.camera.MakeupMaskGenerator
 import com.nyxaiglow.app.camera.lightingState
 import com.nyxaiglow.app.ui.RetouchScreen
+import com.nyxaiglow.app.ui.RetouchState
+import com.nyxaiglow.app.ui.retouchApplyMessage
 import com.nyxaiglow.app.ui.theme.NyxaiGlowTheme
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import java.util.concurrent.Executors
@@ -140,10 +142,7 @@ private fun GlowStudio() {
     var facing by remember { mutableStateOf(CameraSelector.LENS_FACING_FRONT) }
     var flashOn by remember { mutableStateOf(false) }
     var activeTab by remember { mutableStateOf("Camera") }
-    var preserveTexture by remember { mutableStateOf(true) }
-    var smoothingIntensity by remember { mutableFloatStateOf(0.45f) }
-    var selectedRetouchTool by remember { mutableStateOf("Skin") }
-    var selectedRetouchPreset by remember { mutableStateOf("Smooth") }
+    var retouchState by remember { mutableStateOf(RetouchState()) }
     var reticleVisible by remember { mutableStateOf(true) }
     var captureRequest by remember { mutableStateOf(0) }
     val captureLock = remember { AtomicBoolean(false) }
@@ -184,31 +183,22 @@ private fun GlowStudio() {
     Box(Modifier.fillMaxSize().background(Ink)) {
         if (activeTab == "Retouch") {
             RetouchScreen(
-                preserveTexture = preserveTexture,
-                smoothingIntensity = smoothingIntensity,
-                selectedTool = selectedRetouchTool,
-                selectedPreset = selectedRetouchPreset,
-                onTextureToggle = { preserveTexture = !preserveTexture },
-                onSmoothingChange = { smoothingIntensity = it },
-                onToolSelected = { selectedRetouchTool = it },
-                onPresetSelected = { selectedRetouchPreset = it },
+                preserveTexture = retouchState.preserveTexture,
+                smoothingIntensity = retouchState.smoothingIntensity,
+                selectedTool = retouchState.selectedTool,
+                selectedPreset = retouchState.selectedPreset,
+                onTextureToggle = { retouchState = retouchState.copy(preserveTexture = !retouchState.preserveTexture) },
+                onSmoothingChange = { retouchState = retouchState.copy(smoothingIntensity = it.coerceIn(0f, 1f)) },
+                onToolSelected = { retouchState = retouchState.copy(selectedTool = it) },
+                onPresetSelected = { retouchState = retouchState.copy(selectedPreset = it) },
                 onReset = {
-                    preserveTexture = true
-                    smoothingIntensity = 0.45f
-                    selectedRetouchTool = "Skin"
-                    selectedRetouchPreset = "Smooth"
+                    retouchState = retouchState.reset()
                     statusMessage = "Retouch reset"
                 },
-                onApply = {
-                    statusMessage = if (capturedUri == null) {
-                        "No source image; settings applied to live preview"
-                    } else {
-                        "Retouch applied; image saving is not available yet"
-                    }
-                }
+                onApply = { statusMessage = retouchApplyMessage(capturedUri != null) }
             )
         } else {
-            CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest, glow, preserveTexture,
+            CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest, glow, retouchState.preserveTexture, retouchState.smoothingIntensity,
                 onAmbient = { ambient = it },
                 onLandmarksDetected = { result ->
                     if (result.faceLandmarks().isNotEmpty()) statusMessage = "Face detected"
@@ -231,7 +221,7 @@ private fun GlowStudio() {
             Column(Modifier.fillMaxSize().padding(WindowInsets.navigationBars.asPaddingValues()), verticalArrangement = Arrangement.SpaceBetween) {
                 TopBar(flashOn, flashAvailable, { flashOn = !flashOn }, { showSettings = true }, activeTab)
                 Column(Modifier.fillMaxWidth().padding(bottom = 126.dp)) {
-                    CameraOverlay(glow, ambient, preserveTexture, reticleVisible) { preserveTexture = !preserveTexture }
+                    CameraOverlay(glow, ambient, retouchState.preserveTexture, reticleVisible) { retouchState = retouchState.copy(preserveTexture = !retouchState.preserveTexture) }
                     CameraDeck(
                         preset = preset,
                         zoom = zoom,
@@ -268,7 +258,7 @@ private fun GlowStudio() {
                     Column(Modifier.padding(22.dp)) {
                         Text("Camera settings", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(12.dp))
-                        Text("Texture preservation is ${if (preserveTexture) "on" else "off"}.", color = Color(0xFF595F65), fontSize = 14.sp)
+                        Text("Texture preservation is ${if (retouchState.preserveTexture) "on" else "off"}.", color = Color(0xFF595F65), fontSize = 14.sp)
                         Text("Flash and zoom follow the connected camera hardware.", color = Color(0xFF595F65), fontSize = 14.sp)
                         TextButton(onClick = { showSettings = false }) { Text("Done", color = CoralDeep) }
                     }
@@ -441,6 +431,7 @@ private fun CameraPreview(
     captureRequest: Int,
     glowStrength: Float,
     preserveTexture: Boolean,
+    smoothingIntensity: Float,
     onAmbient: (Float) -> Unit,
     onLandmarksDetected: (FaceLandmarkerResult) -> Unit,
     onCapture: (Uri) -> Unit,
@@ -449,7 +440,7 @@ private fun CameraPreview(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val executor = remember { Executors.newSingleThreadExecutor() }
+    val executor = remember(lensFacing) { Executors.newSingleThreadExecutor() }
     val renderer = remember {
         BeautyCameraRenderer(
             context = context,
@@ -470,6 +461,7 @@ private fun CameraPreview(
     DisposableEffect(lensFacing, lifecycleOwner) {
         val disposed = AtomicBoolean(false)
         var localAnalyzer: FaceLandmarkAnalyzer? = null
+        var localAnalysis: ImageAnalysis? = null
         var localProvider: ProcessCameraProvider? = null
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
@@ -481,17 +473,26 @@ private fun CameraPreview(
                 return@addListener
             }
             localProvider = provider
+            renderer.setFrontCamera(lensFacing == CameraSelector.LENS_FACING_FRONT)
             val preview = Preview.Builder().build().also { it.setSurfaceProvider(renderer::provideSurfaceRequest) }
             val analyzer = FaceLandmarkAnalyzer(
                 context = context,
-                onLandmarksDetected = { result ->
-                    val mask = maskGenerator.generateMask(result)
-                    glView.queueEvent { renderer.updateMakeupMask(mask) }
-                    glView.requestRender()
-                    onLandmarksDetected(result)
+                onLandmarksDetected = { result, rotationDegrees ->
+                    val mask = maskGenerator.generateMask(
+                        result,
+                        rotationDegrees = rotationDegrees,
+                        mirrorX = lensFacing == CameraSelector.LENS_FACING_FRONT
+                    )
+                    if (disposed.get()) {
+                        mask.recycle()
+                    } else {
+                        glView.queueEvent { renderer.updateMakeupMask(mask) }
+                        glView.requestRender()
+                        onLandmarksDetected(result)
+                    }
                 },
-                onLightChanged = onAmbient,
-                onError = onCameraError
+                onLightChanged = { if (!disposed.get()) onAmbient(it) },
+                onError = { if (!disposed.get()) onCameraError(it) }
             )
             localAnalyzer = analyzer
             if (disposed.get()) {
@@ -512,6 +513,7 @@ private fun CameraPreview(
                 .setResolutionSelector(analysisResolution)
                 .build()
                 .also { it.setAnalyzer(executor, analyzer) }
+            localAnalysis = analysis
             val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
             provider.unbindAll()
             camera = try {
@@ -522,6 +524,7 @@ private fun CameraPreview(
                 onCameraError("Camera unavailable: ${exception.javaClass.simpleName}")
                 analyzer.close()
                 localAnalyzer = null
+                localAnalysis = null
                 null
             }
         }, ContextCompat.getMainExecutor(context))
@@ -529,9 +532,13 @@ private fun CameraPreview(
             disposed.set(true)
             camera = null
             onFlashAvailabilityChanged(false)
+            localAnalysis?.clearAnalyzer()
             localProvider?.unbindAll()
-            localAnalyzer?.close()
-            localAnalyzer = null
+            localAnalyzer?.let { analyzer ->
+                localAnalyzer = null
+                analyzer.close()
+            }
+            executor.shutdown()
         }
     }
 
@@ -542,16 +549,15 @@ private fun CameraPreview(
             glView.queueEvent {
                 renderer.release {
                     glView.onPause()
-                    executor.shutdown()
                 }
             }
         }
     }
 
-    LaunchedEffect(glowStrength, preserveTexture) {
+    LaunchedEffect(glowStrength, preserveTexture, smoothingIntensity) {
         glView.queueEvent {
             renderer.setGlowStrength(glowStrength)
-            renderer.setSmoothStrength(if (preserveTexture) 0.1f else 0.4f)
+            renderer.setSmoothStrength((if (preserveTexture) smoothingIntensity * 0.5f else smoothingIntensity).coerceIn(0f, 1f))
         }
         glView.requestRender()
     }

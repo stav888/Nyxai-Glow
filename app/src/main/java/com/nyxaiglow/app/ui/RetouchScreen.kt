@@ -129,7 +129,7 @@ fun RetouchScreen(
                 Text("RESET", fontSize = 11.sp)
             }
             Button(onClick = onApply, colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = CoralDeep), modifier = Modifier.weight(2f)) {
-                Text("APPLY", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("APPLY TO PREVIEW", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
