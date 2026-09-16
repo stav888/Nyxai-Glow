@@ -39,23 +39,12 @@ class FaceLandmarkAnalyzer(
 
     override fun analyze(image: ImageProxy) {
         try {
-            val landmarker = faceLandmarker ?: return
             val now = SystemClock.uptimeMillis()
             if (now - lastLightSampleTime >= LIGHT_SAMPLE_INTERVAL_MS) {
                 lastLightSampleTime = now
-                val luminancePlane = image.planes.firstOrNull()?.buffer?.duplicate()
-                if (luminancePlane != null && luminancePlane.hasRemaining()) {
-                    val sampleCount = minOf(120, luminancePlane.remaining())
-                    val step = max(1, luminancePlane.remaining() / sampleCount)
-                    var sum = 0L
-                    var samples = 0
-                    for (index in 0 until luminancePlane.remaining() step step) {
-                        sum += luminancePlane.get(index).toInt() and 0xFF
-                        samples++
-                    }
-                    onLightChanged(if (samples == 0) 0.5f else (sum.toFloat() / samples / 255f).coerceIn(0f, 1f))
-                }
+                sampleLuminance(image)?.let(onLightChanged)
             }
+            val landmarker = faceLandmarker ?: return
             if (now - lastFaceFrameTime < FACE_SAMPLE_INTERVAL_MS) {
                 return
             }
@@ -86,6 +75,28 @@ class FaceLandmarkAnalyzer(
         } finally {
             image.close()
         }
+    }
+
+    private fun sampleLuminance(image: ImageProxy): Float? {
+        val plane = image.planes.firstOrNull() ?: return null
+        val buffer = plane.buffer.duplicate()
+        if (!buffer.hasRemaining()) return null
+        val columns = 12
+        val rows = 10
+        var sum = 0L
+        var samples = 0
+        for (row in 0 until rows) {
+            val y = row * image.height / rows
+            for (column in 0 until columns) {
+                val x = column * image.width / columns
+                val offset = buffer.position() + y * plane.rowStride + x * plane.pixelStride
+                if (offset < buffer.limit()) {
+                    sum += buffer.get(offset).toInt() and 0xFF
+                    samples++
+                }
+            }
+        }
+        return if (samples == 0) null else (sum.toFloat() / samples / 255f).coerceIn(0f, 1f)
     }
 
     fun close() {

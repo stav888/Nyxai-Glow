@@ -183,7 +183,12 @@ private fun GlowStudio() {
 
     Box(Modifier.fillMaxSize().background(Ink)) {
         if (activeTab == "Retouch") {
-            RetouchDashboard(preserveTexture, { preserveTexture = !preserveTexture }, { statusMessage = "Retouch saved" })
+            RetouchDashboard(
+                preserveTexture = preserveTexture,
+                onTextureToggle = { preserveTexture = !preserveTexture },
+                onReset = { statusMessage = "Retouch reset" },
+                onApply = { statusMessage = "Retouch settings applied" }
+            )
         } else {
             CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest, glow, preserveTexture,
                 onAmbient = { ambient = it },
@@ -365,7 +370,15 @@ private fun CameraDeck(preset: String, zoom: String, onPreset: (String) -> Unit,
 }
 
 @Composable
-private fun RetouchDashboard(preserveTexture: Boolean, onTextureToggle: () -> Unit, onApply: () -> Unit) {
+private fun RetouchDashboard(
+    preserveTexture: Boolean,
+    onTextureToggle: () -> Unit,
+    onReset: () -> Unit,
+    onApply: () -> Unit
+) {
+    var selectedTool by remember { mutableStateOf("Skin") }
+    var selectedPreset by remember { mutableStateOf("Smooth") }
+    var smoothing by remember { mutableFloatStateOf(if (preserveTexture) 0.45f else 0.72f) }
     Column(
         Modifier
             .fillMaxSize()
@@ -389,28 +402,32 @@ private fun RetouchDashboard(preserveTexture: Boolean, onTextureToggle: () -> Un
             }
             Spacer(Modifier.height(18.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                RetouchTool("Skin", Icons.Default.AutoAwesome, true)
-                RetouchTool("Shape", Icons.Default.PhotoLibrary, false)
-                RetouchTool("Light", Icons.Default.FlashOn, false)
-                RetouchTool("Makeup", Icons.Default.Palette, false)
+                RetouchTool("Skin", Icons.Default.AutoAwesome, selectedTool == "Skin") { selectedTool = "Skin" }
+                RetouchTool("Shape", Icons.Default.PhotoLibrary, selectedTool == "Shape") { selectedTool = "Shape" }
+                RetouchTool("Light", Icons.Default.FlashOn, selectedTool == "Light") { selectedTool = "Light" }
+                RetouchTool("Makeup", Icons.Default.Palette, selectedTool == "Makeup") { selectedTool = "Makeup" }
             }
             Spacer(Modifier.height(18.dp))
             Text("PRESETS & TONE", color = Color.White.copy(alpha = .64f), fontSize = 10.sp, letterSpacing = 1.sp)
             Spacer(Modifier.height(8.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(listOf("Smooth", "Freckles", "Matte", "Dewy", "Refine")) { item ->
-                    Surface(color = if (item == "Smooth") Coral else SurfaceRaised, shape = RoundedCornerShape(10.dp)) {
+                    Surface(
+                        color = if (item == selectedPreset) Coral else SurfaceRaised,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.clickable { selectedPreset = item }
+                    ) {
                         Column(Modifier.width(58.dp).padding(7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(if (item == "Smooth") CoralDeep else Color(0xFF3B3331)))
+                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(if (item == selectedPreset) CoralDeep else Color(0xFF3B3331)))
                             Spacer(Modifier.height(5.dp))
-                            Text(item, color = if (item == "Smooth") CoralDeep else Color.White, fontSize = 9.sp)
+                            Text(item, color = if (item == selectedPreset) CoralDeep else Color.White, fontSize = 9.sp)
                         }
                     }
                 }
             }
             Spacer(Modifier.height(18.dp))
             Text("Smoothing intensity", color = Color.White, fontSize = 12.sp)
-            Slider(value = if (preserveTexture) .45f else .72f, onValueChange = {}, valueRange = 0f..1f, colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Coral, activeTrackColor = Coral, inactiveTrackColor = SurfaceRaised))
+            Slider(value = smoothing, onValueChange = { smoothing = it }, valueRange = 0f..1f, colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Coral, activeTrackColor = Coral, inactiveTrackColor = SurfaceRaised))
             Surface(color = SurfaceRaised, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onTextureToggle)) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
@@ -422,15 +439,20 @@ private fun RetouchDashboard(preserveTexture: Boolean, onTextureToggle: () -> Un
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = {}, colors = ButtonDefaults.buttonColors(containerColor = SurfaceRaised, contentColor = Color.White), modifier = Modifier.weight(1f)) { Text("RESET", fontSize = 11.sp) }
+            Button(onClick = {
+                selectedTool = "Skin"
+                selectedPreset = "Smooth"
+                smoothing = 0.45f
+                onReset()
+            }, colors = ButtonDefaults.buttonColors(containerColor = SurfaceRaised, contentColor = Color.White), modifier = Modifier.weight(1f)) { Text("RESET", fontSize = 11.sp) }
             Button(onClick = onApply, colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = CoralDeep), modifier = Modifier.weight(2f)) { Text("APPLY & SAVE", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
         }
     }
 }
 
 @Composable
-private fun RetouchTool(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun RetouchTool(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick)) {
         Surface(color = if (selected) Coral.copy(alpha = .2f) else SurfaceRaised, shape = CircleShape, modifier = Modifier.size(42.dp)) {
             Icon(icon, label, tint = if (selected) Coral else Color.White.copy(alpha = .72f), modifier = Modifier.padding(12.dp))
         }
@@ -591,9 +613,12 @@ private fun CameraPreview(
         renderer.setRenderRequest { glView.requestRender() }
         onDispose {
             renderer.setRenderRequest(null)
-            glView.queueEvent { renderer.release() }
-            glView.onPause()
-            executor.shutdown()
+            glView.queueEvent {
+                renderer.release {
+                    glView.onPause()
+                    executor.shutdown()
+                }
+            }
         }
     }
 

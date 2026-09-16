@@ -99,7 +99,7 @@ class BeautyCameraRenderer(
         }
     }
 
-    fun release() {
+    fun release(onComplete: () -> Unit = {}) {
         synchronized(lock) {
             released = true
             pendingRequest?.willNotProvideSurface()
@@ -121,6 +121,7 @@ class BeautyCameraRenderer(
                 program = 0
             }
         }
+        callbackExecutor.execute(onComplete)
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -198,7 +199,13 @@ class BeautyCameraRenderer(
         val request = pendingRequest ?: return
         val surface = cameraSurface ?: return
         pendingRequest = null
-        request.provideSurface(surface, callbackExecutor) { }
+        request.provideSurface(surface, callbackExecutor) { result ->
+            if (result.resultCode != SurfaceRequest.Result.RESULT_SURFACE_USED_SUCCESSFULLY) {
+                callbackExecutor.execute {
+                    onSurfaceError("Camera surface ended: ${result.resultCode}")
+                }
+            }
+        }
     }
 
     private fun createExternalTexture(): Int {
