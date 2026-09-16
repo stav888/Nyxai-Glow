@@ -53,6 +53,9 @@ class BeautyCameraRenderer(
     private var glowLocation = -1
     private var smoothLocation = -1
     private var makeupMaskLocation = -1
+    private var texelSizeLocation = -1
+    private var viewportWidth = 1
+    private var viewportHeight = 1
 
     fun setGlowStrength(value: Float) {
         glowStrength = value.coerceIn(0f, 1f)
@@ -147,6 +150,7 @@ class BeautyCameraRenderer(
             glowLocation = GLES20.glGetUniformLocation(program, "uGlowStrength")
             smoothLocation = GLES20.glGetUniformLocation(program, "uSmoothStrength")
             makeupMaskLocation = GLES20.glGetUniformLocation(program, "uMakeupMask")
+            texelSizeLocation = GLES20.glGetUniformLocation(program, "uTexelSize")
             updateMakeupMask(Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888))
             synchronized(lock) { providePendingRequestLocked() }
         } catch (exception: Exception) {
@@ -155,6 +159,8 @@ class BeautyCameraRenderer(
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        viewportWidth = width.coerceAtLeast(1)
+        viewportHeight = height.coerceAtLeast(1)
         GLES20.glViewport(0, 0, width, height)
     }
 
@@ -175,6 +181,7 @@ class BeautyCameraRenderer(
         GLES20.glUniform1i(GLES20.glGetUniformLocation(program, "uTexture"), 0)
         GLES20.glUniform1f(glowLocation, glowStrength)
         GLES20.glUniform1f(smoothLocation, smoothStrength)
+        GLES20.glUniform2f(texelSizeLocation, 1f / viewportWidth, 1f / viewportHeight)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, makeupTextureId)
         GLES20.glUniform1i(makeupMaskLocation, 1)

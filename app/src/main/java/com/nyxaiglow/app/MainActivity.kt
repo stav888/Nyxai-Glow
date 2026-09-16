@@ -40,8 +40,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -49,7 +47,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.FlipCameraAndroid
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
@@ -58,7 +55,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -93,6 +89,7 @@ import com.nyxaiglow.app.camera.FaceLandmarkAnalyzer
 import com.nyxaiglow.app.camera.BeautyCameraRenderer
 import com.nyxaiglow.app.camera.MakeupMaskGenerator
 import com.nyxaiglow.app.camera.lightingState
+import com.nyxaiglow.app.ui.RetouchScreen
 import com.nyxaiglow.app.ui.theme.NyxaiGlowTheme
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import java.util.concurrent.Executors
@@ -144,6 +141,9 @@ private fun GlowStudio() {
     var flashOn by remember { mutableStateOf(false) }
     var activeTab by remember { mutableStateOf("Camera") }
     var preserveTexture by remember { mutableStateOf(true) }
+    var smoothingIntensity by remember { mutableFloatStateOf(0.45f) }
+    var selectedRetouchTool by remember { mutableStateOf("Skin") }
+    var selectedRetouchPreset by remember { mutableStateOf("Smooth") }
     var reticleVisible by remember { mutableStateOf(true) }
     var captureRequest by remember { mutableStateOf(0) }
     val captureLock = remember { AtomicBoolean(false) }
@@ -183,11 +183,29 @@ private fun GlowStudio() {
 
     Box(Modifier.fillMaxSize().background(Ink)) {
         if (activeTab == "Retouch") {
-            RetouchDashboard(
+            RetouchScreen(
                 preserveTexture = preserveTexture,
+                smoothingIntensity = smoothingIntensity,
+                selectedTool = selectedRetouchTool,
+                selectedPreset = selectedRetouchPreset,
                 onTextureToggle = { preserveTexture = !preserveTexture },
-                onReset = { statusMessage = "Retouch reset" },
-                onApply = { statusMessage = "Retouch settings applied" }
+                onSmoothingChange = { smoothingIntensity = it },
+                onToolSelected = { selectedRetouchTool = it },
+                onPresetSelected = { selectedRetouchPreset = it },
+                onReset = {
+                    preserveTexture = true
+                    smoothingIntensity = 0.45f
+                    selectedRetouchTool = "Skin"
+                    selectedRetouchPreset = "Smooth"
+                    statusMessage = "Retouch reset"
+                },
+                onApply = {
+                    statusMessage = if (capturedUri == null) {
+                        "No source image; settings applied to live preview"
+                    } else {
+                        "Retouch applied; image saving is not available yet"
+                    }
+                }
             )
         } else {
             CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest, glow, preserveTexture,
@@ -366,98 +384,6 @@ private fun CameraDeck(preset: String, zoom: String, onPreset: (String) -> Unit,
             IconButton(onClick = onFlip) { Icon(Icons.Default.FlipCameraAndroid, "Flip camera", tint = Color.White.copy(alpha = .86f), modifier = Modifier.size(27.dp)) }
         }
         Spacer(Modifier.height(13.dp))
-    }
-}
-
-@Composable
-private fun RetouchDashboard(
-    preserveTexture: Boolean,
-    onTextureToggle: () -> Unit,
-    onReset: () -> Unit,
-    onApply: () -> Unit
-) {
-    var selectedTool by remember { mutableStateOf("Skin") }
-    var selectedPreset by remember { mutableStateOf("Smooth") }
-    var smoothing by remember { mutableFloatStateOf(if (preserveTexture) 0.45f else 0.72f) }
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(SurfaceDark)
-            .padding(start = 16.dp, top = 72.dp, end = 16.dp, bottom = 104.dp),
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("AI CORE V2.4 ACTIVE", color = Color.White.copy(alpha = .78f), fontSize = 10.sp, letterSpacing = 1.sp)
-                Surface(color = SurfaceRaised, shape = RoundedCornerShape(50)) {
-                    Text("HOLD BEFORE", color = Color.White, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
-                }
-            }
-            Spacer(Modifier.height(18.dp))
-            Surface(color = Color.Black.copy(alpha = .34f), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().height(310.dp)) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    GlowReticle(Modifier.size(172.dp), .72f, .62f)
-                    Text("98.4% NATURAL MATCH", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.TopCenter).padding(top = 18.dp))
-                }
-            }
-            Spacer(Modifier.height(18.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                RetouchTool("Skin", Icons.Default.AutoAwesome, selectedTool == "Skin") { selectedTool = "Skin" }
-                RetouchTool("Shape", Icons.Default.PhotoLibrary, selectedTool == "Shape") { selectedTool = "Shape" }
-                RetouchTool("Light", Icons.Default.FlashOn, selectedTool == "Light") { selectedTool = "Light" }
-                RetouchTool("Makeup", Icons.Default.Palette, selectedTool == "Makeup") { selectedTool = "Makeup" }
-            }
-            Spacer(Modifier.height(18.dp))
-            Text("PRESETS & TONE", color = Color.White.copy(alpha = .64f), fontSize = 10.sp, letterSpacing = 1.sp)
-            Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(listOf("Smooth", "Freckles", "Matte", "Dewy", "Refine")) { item ->
-                    Surface(
-                        color = if (item == selectedPreset) Coral else SurfaceRaised,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.clickable { selectedPreset = item }
-                    ) {
-                        Column(Modifier.width(58.dp).padding(7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(if (item == selectedPreset) CoralDeep else Color(0xFF3B3331)))
-                            Spacer(Modifier.height(5.dp))
-                            Text(item, color = if (item == selectedPreset) CoralDeep else Color.White, fontSize = 9.sp)
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(18.dp))
-            Text("Smoothing intensity", color = Color.White, fontSize = 12.sp)
-            Slider(value = smoothing, onValueChange = { smoothing = it }, valueRange = 0f..1f, colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Coral, activeTrackColor = Coral, inactiveTrackColor = SurfaceRaised))
-            Surface(color = SurfaceRaised, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onTextureToggle)) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column {
-                        Text("Subtle Micro-Texture", color = Color.White, fontSize = 12.sp)
-                        Text("Preserves natural pores & grain", color = Color.White.copy(alpha = .58f), fontSize = 10.sp)
-                    }
-                    Text(if (preserveTexture) "ON" else "OFF", color = if (preserveTexture) Coral else Color.White.copy(alpha = .5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = {
-                selectedTool = "Skin"
-                selectedPreset = "Smooth"
-                smoothing = 0.45f
-                onReset()
-            }, colors = ButtonDefaults.buttonColors(containerColor = SurfaceRaised, contentColor = Color.White), modifier = Modifier.weight(1f)) { Text("RESET", fontSize = 11.sp) }
-            Button(onClick = onApply, colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = CoralDeep), modifier = Modifier.weight(2f)) { Text("APPLY & SAVE", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-        }
-    }
-}
-
-@Composable
-private fun RetouchTool(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick)) {
-        Surface(color = if (selected) Coral.copy(alpha = .2f) else SurfaceRaised, shape = CircleShape, modifier = Modifier.size(42.dp)) {
-            Icon(icon, label, tint = if (selected) Coral else Color.White.copy(alpha = .72f), modifier = Modifier.padding(12.dp))
-        }
-        Spacer(Modifier.height(5.dp))
-        Text(label, color = if (selected) Coral else Color.White.copy(alpha = .7f), fontSize = 10.sp)
     }
 }
 
