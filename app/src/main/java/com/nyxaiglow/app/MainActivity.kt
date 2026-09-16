@@ -92,6 +92,7 @@ import com.nyxaiglow.app.camera.lightingState
 import com.nyxaiglow.app.ui.theme.NyxaiGlowTheme
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.delay
 
@@ -146,10 +147,6 @@ private fun GlowStudio() {
     var statusMessage by remember { mutableStateOf("Ready") }
     var showSettings by remember { mutableStateOf(false) }
     var flashAvailable by remember { mutableStateOf(false) }
-    var retouchIntensity by remember { mutableFloatStateOf(0.45f) }
-    var retouchTool by remember { mutableStateOf("Skin") }
-    var retouchPreset by remember { mutableStateOf("Smooth") }
-    var faceDetected by remember { mutableStateOf(false) }
     val legacyStorageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             captureRequest++
@@ -182,40 +179,12 @@ private fun GlowStudio() {
 
     Box(Modifier.fillMaxSize().background(Ink)) {
         if (activeTab == "Retouch") {
-            RetouchDashboard(
-                preserveTexture = preserveTexture,
-                intensity = retouchIntensity,
-                selectedTool = retouchTool,
-                selectedPreset = retouchPreset,
-                hasSourcePhoto = capturedUri != null,
-                onTextureToggle = { preserveTexture = !preserveTexture },
-                onIntensityChange = { retouchIntensity = it },
-                onToolSelected = { retouchTool = it },
-                onPresetSelected = { retouchPreset = it },
-                onReset = {
-                    preserveTexture = true
-                    retouchIntensity = 0.45f
-                    retouchTool = "Skin"
-                    retouchPreset = "Smooth"
-                },
-                onApply = {
-                    val source = capturedUri
-                    statusMessage = when {
-                        source == null -> "Capture or select a photo first"
-                        saveRetouchedCopy(context, source) -> "Retouched copy saved"
-                        else -> "Could not save retouched photo"
-                    }
-                }
-            )
+            RetouchDashboard(preserveTexture, { preserveTexture = !preserveTexture }, { statusMessage = "Retouch saved" })
         } else {
             CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest,
                 onAmbient = { ambient = it },
                 onLandmarksDetected = { result ->
-                    val detected = result.faceLandmarks().isNotEmpty()
-                    if (detected != faceDetected) {
-                        faceDetected = detected
-                        statusMessage = if (detected) "Face detected" else "No face detected"
-                    }
+                    if (result.faceLandmarks().isNotEmpty()) statusMessage = "Face detected"
                 },
                 onCapture = { uri ->
                     captureLock.set(false)
@@ -392,19 +361,7 @@ private fun CameraDeck(preset: String, zoom: String, onPreset: (String) -> Unit,
 }
 
 @Composable
-private fun RetouchDashboard(
-    preserveTexture: Boolean,
-    intensity: Float,
-    selectedTool: String,
-    selectedPreset: String,
-    hasSourcePhoto: Boolean,
-    onTextureToggle: () -> Unit,
-    onIntensityChange: (Float) -> Unit,
-    onToolSelected: (String) -> Unit,
-    onPresetSelected: (String) -> Unit,
-    onReset: () -> Unit,
-    onApply: () -> Unit
-) {
+private fun RetouchDashboard(preserveTexture: Boolean, onTextureToggle: () -> Unit, onApply: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
@@ -428,28 +385,28 @@ private fun RetouchDashboard(
             }
             Spacer(Modifier.height(18.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                RetouchTool("Skin", Icons.Default.AutoAwesome, selectedTool == "Skin", onToolSelected)
-                RetouchTool("Shape", Icons.Default.PhotoLibrary, selectedTool == "Shape", onToolSelected)
-                RetouchTool("Light", Icons.Default.FlashOn, selectedTool == "Light", onToolSelected)
-                RetouchTool("Makeup", Icons.Default.Palette, selectedTool == "Makeup", onToolSelected)
+                RetouchTool("Skin", Icons.Default.AutoAwesome, true)
+                RetouchTool("Shape", Icons.Default.PhotoLibrary, false)
+                RetouchTool("Light", Icons.Default.FlashOn, false)
+                RetouchTool("Makeup", Icons.Default.Palette, false)
             }
             Spacer(Modifier.height(18.dp))
             Text("PRESETS & TONE", color = Color.White.copy(alpha = .64f), fontSize = 10.sp, letterSpacing = 1.sp)
             Spacer(Modifier.height(8.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(listOf("Smooth", "Freckles", "Matte", "Dewy", "Refine")) { item ->
-                    Surface(color = if (item == selectedPreset) Coral else SurfaceRaised, shape = RoundedCornerShape(10.dp), modifier = Modifier.clickable { onPresetSelected(item) }) {
+                    Surface(color = if (item == "Smooth") Coral else SurfaceRaised, shape = RoundedCornerShape(10.dp)) {
                         Column(Modifier.width(58.dp).padding(7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(if (item == selectedPreset) CoralDeep else Color(0xFF3B3331)))
+                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(if (item == "Smooth") CoralDeep else Color(0xFF3B3331)))
                             Spacer(Modifier.height(5.dp))
-                            Text(item, color = if (item == selectedPreset) CoralDeep else Color.White, fontSize = 9.sp)
+                            Text(item, color = if (item == "Smooth") CoralDeep else Color.White, fontSize = 9.sp)
                         }
                     }
                 }
             }
             Spacer(Modifier.height(18.dp))
             Text("Smoothing intensity", color = Color.White, fontSize = 12.sp)
-            Slider(value = intensity, onValueChange = onIntensityChange, valueRange = 0f..1f, colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Coral, activeTrackColor = Coral, inactiveTrackColor = SurfaceRaised))
+            Slider(value = if (preserveTexture) .45f else .72f, onValueChange = {}, valueRange = 0f..1f, colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Coral, activeTrackColor = Coral, inactiveTrackColor = SurfaceRaised))
             Surface(color = SurfaceRaised, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onTextureToggle)) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
@@ -461,57 +418,20 @@ private fun RetouchDashboard(
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = onReset, colors = ButtonDefaults.buttonColors(containerColor = SurfaceRaised, contentColor = Color.White), modifier = Modifier.weight(1f)) { Text("RESET", fontSize = 11.sp) }
-            Button(onClick = onApply, enabled = hasSourcePhoto, colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = CoralDeep), modifier = Modifier.weight(2f)) { Text(if (hasSourcePhoto) "APPLY & SAVE" else "SELECT A PHOTO", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            Button(onClick = {}, colors = ButtonDefaults.buttonColors(containerColor = SurfaceRaised, contentColor = Color.White), modifier = Modifier.weight(1f)) { Text("RESET", fontSize = 11.sp) }
+            Button(onClick = onApply, colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = CoralDeep), modifier = Modifier.weight(2f)) { Text("APPLY & SAVE", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
         }
     }
 }
 
 @Composable
-private fun RetouchTool(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onSelected: (String) -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onSelected(label) }) {
+private fun RetouchTool(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Surface(color = if (selected) Coral.copy(alpha = .2f) else SurfaceRaised, shape = CircleShape, modifier = Modifier.size(42.dp)) {
             Icon(icon, label, tint = if (selected) Coral else Color.White.copy(alpha = .72f), modifier = Modifier.padding(12.dp))
         }
         Spacer(Modifier.height(5.dp))
         Text(label, color = if (selected) Coral else Color.White.copy(alpha = .7f), fontSize = 10.sp)
-    }
-}
-
-private fun saveRetouchedCopy(context: android.content.Context, sourceUri: Uri): Boolean {
-    var outputUri: Uri? = null
-    return try {
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "NyxaiGlow_Retouched_${System.currentTimeMillis()}.jpg")
-            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Nyxai Glow")
-                put(MediaStore.Images.Media.IS_PENDING, 1)
-            }
-        }
-        outputUri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-            ?: return false
-        val copied = context.contentResolver.openInputStream(sourceUri).use { input ->
-            context.contentResolver.openOutputStream(outputUri!!).use { output ->
-                if (input == null || output == null) {
-                    false
-                } else {
-                    input.copyTo(output)
-                    true
-                }
-            }
-        }
-        if (!copied) {
-            context.contentResolver.delete(outputUri!!, null, null)
-            return false
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            context.contentResolver.update(outputUri!!, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
-        }
-        true
-    } catch (_: Exception) {
-        outputUri?.let { try { context.contentResolver.delete(it, null, null) } catch (_: Exception) { } }
-        false
     }
 }
 
@@ -579,57 +499,57 @@ private fun CameraPreview(
     val previewView = remember { PreviewView(context) }
     val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
     var camera by remember { mutableStateOf<Camera?>(null) }
-    var faceAnalyzer: FaceLandmarkAnalyzer? = null
-
-    DisposableEffect(lensFacing) {
-        var disposed = false
-        var analysis: ImageAnalysis? = null
+    DisposableEffect(lensFacing, lifecycleOwner) {
+        val disposed = AtomicBoolean(false)
+        var localAnalyzer: FaceLandmarkAnalyzer? = null
+        var localProvider: ProcessCameraProvider? = null
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
-            if (disposed) return@addListener
+            if (disposed.get()) return@addListener
             val provider = try {
                 future.get()
             } catch (exception: Exception) {
                 onCameraError("Camera initialization failed: ${exception.message ?: exception.javaClass.simpleName}")
                 return@addListener
             }
+            localProvider = provider
             val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
-            faceAnalyzer = FaceLandmarkAnalyzer(
+            val analyzer = FaceLandmarkAnalyzer(
                 context = context,
                 onLandmarksDetected = onLandmarksDetected,
                 onLightChanged = onAmbient,
                 onError = onCameraError
             )
-            analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also { it.setAnalyzer(executor, faceAnalyzer!!) }
-            val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
-            if (disposed) {
-                faceAnalyzer?.close()
-                faceAnalyzer = null
+            localAnalyzer = analyzer
+            if (disposed.get()) {
+                analyzer.close()
+                localAnalyzer = null
                 return@addListener
             }
+            val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also { it.setAnalyzer(executor, analyzer) }
+            val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
             provider.unbindAll()
-            if (disposed) return@addListener
             camera = try {
                 provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, analysis).also {
                     onFlashAvailabilityChanged(it.cameraInfo.hasFlashUnit())
                 }
             } catch (exception: Exception) {
                 onCameraError("Camera unavailable: ${exception.javaClass.simpleName}")
+                analyzer.close()
+                localAnalyzer = null
                 null
             }
         }, ContextCompat.getMainExecutor(context))
         onDispose {
-            disposed = true
+            disposed.set(true)
             camera = null
-            analysis?.clearAnalyzer()
             onFlashAvailabilityChanged(false)
-            faceAnalyzer?.close()
-            faceAnalyzer = null
-            if (future.isDone && !future.isCancelled) {
-                runCatching { future.get().unbindAll() }
-            }
+            localProvider?.unbindAll()
+            localAnalyzer?.close()
+            localAnalyzer = null
         }
     }
+
     DisposableEffect(Unit) {
         onDispose { executor.shutdown() }
     }
@@ -648,48 +568,52 @@ private fun CameraPreview(
 
     LaunchedEffect(captureRequest) {
         if (captureRequest == 0) return@LaunchedEffect
-        var outputUri: Uri? = null
+        if (executor.isShutdown) {
+            onCameraError("Camera session ended")
+            return@LaunchedEffect
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "NyxaiGlow_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Nyxai Glow")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            onCameraError("Storage permission is required to save photos")
+            return@LaunchedEffect
+        }
+        val outputUri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+        if (outputUri == null) {
+            onCameraError("Could not prepare photo storage")
+            return@LaunchedEffect
+        }
+        val metadata = ImageCapture.Metadata().apply {
+            isReversedHorizontal = lensFacing == CameraSelector.LENS_FACING_FRONT
+        }
+        val output = ImageCapture.OutputFileOptions.Builder(context.contentResolver, outputUri, values)
+            .setMetadata(metadata)
+            .build()
         try {
-            val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, "NyxaiGlow_${System.currentTimeMillis()}.jpg")
-                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Nyxai Glow")
-                    put(MediaStore.Images.Media.IS_PENDING, 1)
-                }
-            }
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-            ) {
-                onCameraError("Storage permission is required to save photos")
-                return@LaunchedEffect
-            }
-            outputUri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                ?: run {
-                    onCameraError("Could not prepare photo storage")
-                    return@LaunchedEffect
-                }
-            val output = ImageCapture.OutputFileOptions.Builder(context.contentResolver, outputUri, values).build()
             imageCapture.takePicture(output, executor, object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            context.contentResolver.update(outputUri!!, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
-                        }
-                        onCapture(outputUri!!)
-                    } catch (exception: Exception) {
-                        onCameraError("Capture completed with an error")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        context.contentResolver.update(outputUri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
                     }
+                    onCapture(outputUri)
                 }
 
                 override fun onError(exception: ImageCaptureException) {
-                    try { context.contentResolver.delete(outputUri!!, null, null) } catch (_: Exception) { }
-                    onCameraError("Capture failed: ${exception.message ?: "unknown error"}")
+                    context.contentResolver.delete(outputUri, null, null)
+                    onCameraError("Capture failed")
                 }
             })
-        } catch (exception: Exception) {
-            outputUri?.let { try { context.contentResolver.delete(it, null, null) } catch (_: Exception) { } }
-            onCameraError("Capture failed: ${exception.message ?: "unknown error"}")
+        } catch (_: RejectedExecutionException) {
+            context.contentResolver.delete(outputUri, null, null)
+            onCameraError("Camera session ended")
         }
     }
 

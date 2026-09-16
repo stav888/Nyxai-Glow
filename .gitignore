@@ -9,3 +9,16 @@
 /captures
 .externalNativeBuild
 .cxx
+
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+.kotlin/
+app/release/
+local.properties
