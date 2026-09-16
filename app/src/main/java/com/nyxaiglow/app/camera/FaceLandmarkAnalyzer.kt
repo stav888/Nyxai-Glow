@@ -16,7 +16,6 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
-import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 
@@ -29,7 +28,7 @@ class FaceLandmarkAnalyzer(
     private var lastFaceFrameTime = 0L
     private var lastLightSampleTime = 0L
     private val bitmapLock = Any()
-    private val pendingBitmaps = ArrayDeque<Bitmap>()
+    private var inFlightBitmap: Bitmap? = null
     private val closed = AtomicBoolean(false)
     private val faceLandmarker: FaceLandmarker? = createFaceLandmarker(
         context,
@@ -63,10 +62,11 @@ class FaceLandmarkAnalyzer(
             lastFaceFrameTime = now
             val bitmap = image.toRgbaBitmap() ?: return
             synchronized(bitmapLock) {
-                while (pendingBitmaps.size >= MAX_PENDING_BITMAPS) {
-                    pendingBitmaps.removeFirst().recycle()
+                if (inFlightBitmap != null) {
+                    bitmap.recycle()
+                    return
                 }
-                pendingBitmaps.addLast(bitmap)
+                inFlightBitmap = bitmap
             }
             val mpImage = BitmapImageBuilder(bitmap).build()
             val processingOptions = ImageProcessingOptions.builder()
@@ -75,7 +75,9 @@ class FaceLandmarkAnalyzer(
             try {
                 landmarker.detectAsync(mpImage, processingOptions, now)
             } catch (exception: Exception) {
-                synchronized(bitmapLock) { pendingBitmaps.remove(bitmap) }
+                synchronized(bitmapLock) {
+                    if (inFlightBitmap === bitmap) inFlightBitmap = null
+                }
                 bitmap.recycle()
                 throw exception
             }
@@ -90,17 +92,15 @@ class FaceLandmarkAnalyzer(
         if (!closed.compareAndSet(false, true)) return
         faceLandmarker?.close()
         synchronized(bitmapLock) {
-            while (pendingBitmaps.isNotEmpty()) {
-                pendingBitmaps.removeFirst().recycle()
-            }
+            inFlightBitmap?.recycle()
+            inFlightBitmap = null
         }
     }
 
     private fun recycleCompletedBitmap() {
         synchronized(bitmapLock) {
-            if (pendingBitmaps.isNotEmpty()) {
-                pendingBitmaps.removeFirst().recycle()
-            }
+            inFlightBitmap?.recycle()
+            inFlightBitmap = null
         }
     }
 
@@ -108,7 +108,6 @@ class FaceLandmarkAnalyzer(
         const val MODEL_NAME = "face_landmarker.task"
         const val FACE_SAMPLE_INTERVAL_MS = 100L
         const val LIGHT_SAMPLE_INTERVAL_MS = 250L
-        const val MAX_PENDING_BITMAPS = 3
     }
 }
 

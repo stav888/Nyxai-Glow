@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Size
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -17,8 +18,9 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.ResolutionSelector
+import androidx.camera.core.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -88,6 +90,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nyxaiglow.app.camera.FaceLandmarkAnalyzer
+import com.nyxaiglow.app.camera.BeautyCameraRenderer
+import com.nyxaiglow.app.camera.MakeupMaskGenerator
 import com.nyxaiglow.app.camera.lightingState
 import com.nyxaiglow.app.ui.theme.NyxaiGlowTheme
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
@@ -181,7 +185,7 @@ private fun GlowStudio() {
         if (activeTab == "Retouch") {
             RetouchDashboard(preserveTexture, { preserveTexture = !preserveTexture }, { statusMessage = "Retouch saved" })
         } else {
-            CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest,
+            CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest, glow, preserveTexture,
                 onAmbient = { ambient = it },
                 onLandmarksDetected = { result ->
                     if (result.faceLandmarks().isNotEmpty()) statusMessage = "Face detected"
@@ -487,6 +491,8 @@ private fun CameraPreview(
     zoom: String,
     flashOn: Boolean,
     captureRequest: Int,
+    glowStrength: Float,
+    preserveTexture: Boolean,
     onAmbient: (Float) -> Unit,
     onLandmarksDetected: (FaceLandmarkerResult) -> Unit,
     onCapture: (Uri) -> Unit,
@@ -496,7 +502,21 @@ private fun CameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
-    val previewView = remember { PreviewView(context) }
+    val renderer = remember {
+        BeautyCameraRenderer(
+            context = context,
+            callbackExecutor = ContextCompat.getMainExecutor(context),
+            onSurfaceError = onCameraError
+        )
+    }
+    val glView = remember {
+        android.opengl.GLSurfaceView(context).apply {
+            setEGLContextClientVersion(2)
+            setRenderer(renderer)
+            renderMode = android.opengl.GLSurfaceView.RENDERMODE_WHEN_DIRTY
+        }
+    }
+    val maskGenerator = remember { MakeupMaskGenerator() }
     val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
     var camera by remember { mutableStateOf<Camera?>(null) }
     DisposableEffect(lensFacing, lifecycleOwner) {
@@ -513,10 +533,15 @@ private fun CameraPreview(
                 return@addListener
             }
             localProvider = provider
-            val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
+            val preview = Preview.Builder().build().also { it.setSurfaceProvider(renderer::provideSurfaceRequest) }
             val analyzer = FaceLandmarkAnalyzer(
                 context = context,
-                onLandmarksDetected = onLandmarksDetected,
+                onLandmarksDetected = { result ->
+                    val mask = maskGenerator.generateMask(result)
+                    glView.queueEvent { renderer.updateMakeupMask(mask) }
+                    glView.requestRender()
+                    onLandmarksDetected(result)
+                },
                 onLightChanged = onAmbient,
                 onError = onCameraError
             )
@@ -526,7 +551,19 @@ private fun CameraPreview(
                 localAnalyzer = null
                 return@addListener
             }
-            val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also { it.setAnalyzer(executor, analyzer) }
+            val analysisResolution = ResolutionSelector.Builder()
+                .setResolutionStrategy(
+                    ResolutionStrategy(
+                        Size(640, 480),
+                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
+                    )
+                )
+                .build()
+            val analysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setResolutionSelector(analysisResolution)
+                .build()
+                .also { it.setAnalyzer(executor, analyzer) }
             val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
             provider.unbindAll()
             camera = try {
@@ -551,7 +588,21 @@ private fun CameraPreview(
     }
 
     DisposableEffect(Unit) {
-        onDispose { executor.shutdown() }
+        renderer.setRenderRequest { glView.requestRender() }
+        onDispose {
+            renderer.setRenderRequest(null)
+            glView.queueEvent { renderer.release() }
+            glView.onPause()
+            executor.shutdown()
+        }
+    }
+
+    LaunchedEffect(glowStrength, preserveTexture) {
+        glView.queueEvent {
+            renderer.setGlowStrength(glowStrength)
+            renderer.setSmoothStrength(if (preserveTexture) 0.1f else 0.4f)
+        }
+        glView.requestRender()
     }
 
     LaunchedEffect(camera, zoom, flashOn) {
@@ -617,5 +668,5 @@ private fun CameraPreview(
         }
     }
 
-    AndroidView(factory = { previewView }, modifier = modifier)
+    AndroidView(factory = { glView }, modifier = modifier)
 }
