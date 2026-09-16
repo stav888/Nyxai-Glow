@@ -38,16 +38,16 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Run unit tests
-        if: steps.android_sdk.outcome == 'success'
+        if: always() && steps.android_sdk.outcome == 'success'
         run: ./gradlew --no-daemon testDebugUnitTest
       - name: Run lint
-        if: steps.android_sdk.outcome == 'success'
+        if: always() && steps.android_sdk.outcome == 'success'
         run: ./gradlew --no-daemon lintDebug
       - name: Assemble debug APK
-        if: steps.android_sdk.outcome == 'success'
+        if: always() && steps.android_sdk.outcome == 'success'
         run: ./gradlew --no-daemon assembleDebug
       - name: Assemble release APK
-        if: steps.android_sdk.outcome == 'success'
+        if: always() && steps.android_sdk.outcome == 'success'
         run: ./gradlew --no-daemon assembleRelease
       - name: Upload test reports
         if: always()

@@ -14,12 +14,13 @@ class MakeupMaskGenerator {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
-    private val maskBitmap = Bitmap.createBitmap(MASK_SIZE, MASK_SIZE, Bitmap.Config.ARGB_8888)
+    private val maskBitmap = Bitmap.createBitmap(MASK_WIDTH, MASK_HEIGHT, Bitmap.Config.ARGB_8888)
     private val canvas = Canvas(maskBitmap)
 
     @Synchronized
     fun generateMask(result: FaceLandmarkerResult, rotationDegrees: Int = 0, mirrorX: Boolean = false): Bitmap {
-        // MediaPipe coordinates are converted once here; the renderer mirrors the camera texture once.
+        // MediaPipe image coordinates are rotated and optionally mirrored here once.
+        // The renderer samples the camera texture without an additional mirror.
         canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
         val faces = result.faceLandmarks()
         if (faces.isEmpty()) return Bitmap.createBitmap(maskBitmap)
@@ -29,7 +30,7 @@ class MakeupMaskGenerator {
             if (index !in landmarks.indices) return null
             val landmark = landmarks[index]
             val normalized = CoordinateConverter.fromRotatedImage(landmark.x(), landmark.y(), rotationDegrees, mirrorX)
-            return (normalized.first * MASK_SIZE) to (normalized.second * MASK_SIZE)
+            return (normalized.first * MASK_WIDTH) to (normalized.second * MASK_HEIGHT)
         }
 
         paint.color = Color.argb(205, 255, 0, 0)
@@ -84,7 +85,9 @@ class MakeupMaskGenerator {
     }
 
     private companion object {
-        const val MASK_SIZE = 256
+        // Matches the shared CameraX preview/analysis resolution.
+        const val MASK_WIDTH = 640
+        const val MASK_HEIGHT = 480
         val LIP_INDICES = intArrayOf(
             61, 185, 40, 39, 37, 0, 267, 269, 270, 409,
             291, 375, 321, 405, 314, 17, 84, 181, 91, 146

@@ -40,6 +40,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -200,7 +202,7 @@ private fun GlowStudio() {
         } else {
             CameraPreview(Modifier.fillMaxSize(), facing, zoom, flashOn, captureRequest, glow, retouchState.preserveTexture, retouchState.smoothingIntensity,
                 onAmbient = { ambient = it },
-                onLandmarksDetected = { result ->
+                onLandmarksDetected = { result, _ ->
                     if (result.faceLandmarks().isNotEmpty()) statusMessage = "Face detected"
                 },
                 onCapture = { uri ->
@@ -433,14 +435,14 @@ private fun CameraPreview(
     preserveTexture: Boolean,
     smoothingIntensity: Float,
     onAmbient: (Float) -> Unit,
-    onLandmarksDetected: (FaceLandmarkerResult) -> Unit,
+    onLandmarksDetected: (FaceLandmarkerResult, Int) -> Unit,
     onCapture: (Uri) -> Unit,
     onCameraError: (String) -> Unit,
     onFlashAvailabilityChanged: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val executor = remember(lensFacing) { Executors.newSingleThreadExecutor() }
+    val executor = remember { Executors.newSingleThreadExecutor() }
     val renderer = remember {
         BeautyCameraRenderer(
             context = context,
@@ -473,8 +475,18 @@ private fun CameraPreview(
                 return@addListener
             }
             localProvider = provider
-            renderer.setFrontCamera(lensFacing == CameraSelector.LENS_FACING_FRONT)
-            val preview = Preview.Builder().build().also { it.setSurfaceProvider(renderer::provideSurfaceRequest) }
+            val analysisResolution = ResolutionSelector.Builder()
+                .setResolutionStrategy(
+                    ResolutionStrategy(
+                        Size(640, 480),
+                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
+                    )
+                )
+                .build()
+            val preview = Preview.Builder()
+                .setResolutionSelector(analysisResolution)
+                .build()
+                .also { it.setSurfaceProvider(renderer::provideSurfaceRequest) }
             val analyzer = FaceLandmarkAnalyzer(
                 context = context,
                 onLandmarksDetected = { result, rotationDegrees ->
@@ -488,7 +500,7 @@ private fun CameraPreview(
                     } else {
                         glView.queueEvent { renderer.updateMakeupMask(mask) }
                         glView.requestRender()
-                        onLandmarksDetected(result)
+                        onLandmarksDetected(result, rotationDegrees)
                     }
                 },
                 onLightChanged = { if (!disposed.get()) onAmbient(it) },
@@ -500,14 +512,6 @@ private fun CameraPreview(
                 localAnalyzer = null
                 return@addListener
             }
-            val analysisResolution = ResolutionSelector.Builder()
-                .setResolutionStrategy(
-                    ResolutionStrategy(
-                        Size(640, 480),
-                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
-                    )
-                )
-                .build()
             val analysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setResolutionSelector(analysisResolution)
@@ -538,19 +542,21 @@ private fun CameraPreview(
                 localAnalyzer = null
                 analyzer.close()
             }
-            executor.shutdown()
         }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { executor.shutdown() }
     }
 
     DisposableEffect(Unit) {
         renderer.setRenderRequest { glView.requestRender() }
         onDispose {
             renderer.setRenderRequest(null)
-            glView.queueEvent {
-                renderer.release {
-                    glView.onPause()
-                }
+            renderer.release {
+                glView.onPause()
             }
+            glView.queueEvent { renderer.releaseGlResources() }
         }
     }
 

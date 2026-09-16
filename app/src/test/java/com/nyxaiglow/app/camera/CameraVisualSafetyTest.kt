@@ -29,6 +29,14 @@ class CameraVisualSafetyTest {
     }
 
     @Test
+    fun coordinateConversionHandlesAllRightAngleRotations() {
+        assertEquals(0.2f to 0.3f, MakeupMaskGenerator.CoordinateConverter.fromRotatedImage(.2f, .3f, 0, false))
+        assertEquals(0.3f to 0.8f, MakeupMaskGenerator.CoordinateConverter.fromRotatedImage(.2f, .3f, 90, false))
+        assertEquals(0.8f to 0.7f, MakeupMaskGenerator.CoordinateConverter.fromRotatedImage(.2f, .3f, 180, false))
+        assertEquals(0.7f to 0.2f, MakeupMaskGenerator.CoordinateConverter.fromRotatedImage(.2f, .3f, 270, false))
+    }
+
+    @Test
     fun coordinateConversionClampsMaskBounds() {
         val point = MakeupMaskGenerator.CoordinateConverter.fromRotatedImage(-2f, 3f, 0, false)
         assertEquals(0f, point.first, .0001f)
@@ -40,6 +48,15 @@ class CameraVisualSafetyTest {
         assertEquals(0f, RendererParameters.clampStrength(-1f), .0001f)
         assertEquals(1f, RendererParameters.clampStrength(2f), .0001f)
         assertEquals(.4f, RendererParameters.clampStrength(.4f), .0001f)
+    }
+
+    @Test
+    fun rendererReleaseStateIsIdempotent() {
+        val state = RendererReleaseState()
+        assertTrue(state.request())
+        assertTrue(!state.request())
+        assertTrue(state.markResourcesReleased())
+        assertTrue(!state.markResourcesReleased())
     }
 
     @Test

@@ -17,7 +17,13 @@ import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.max
+
+private data class InFlightFrame(
+    val bitmap: Bitmap,
+    val rotationDegrees: Int
+)
+
+private const val FACE_LANDMARK_MODEL_NAME = "face_landmarker.task"
 
 class FaceLandmarkAnalyzer(
     context: Context,
@@ -28,19 +34,19 @@ class FaceLandmarkAnalyzer(
     private var lastFaceFrameTime = 0L
     private var lastLightSampleTime = 0L
     private val bitmapLock = Any()
-    private var inFlightBitmap: Bitmap? = null
-    @Volatile
-    private var lastRotationDegrees = 0
+    private var inFlightFrame: InFlightFrame? = null
     private val closed = AtomicBoolean(false)
     private val faceLandmarker: FaceLandmarker? = createFaceLandmarker(
         context,
         onLandmarksDetected,
         onError,
-        ::recycleCompletedBitmap
+        ::takeInFlightFrame,
+        closed
     )
 
     override fun analyze(image: ImageProxy) {
         try {
+            if (closed.get()) return
             val now = SystemClock.uptimeMillis()
             if (now - lastLightSampleTime >= LIGHT_SAMPLE_INTERVAL_MS) {
                 lastLightSampleTime = now
@@ -52,25 +58,29 @@ class FaceLandmarkAnalyzer(
             }
             lastFaceFrameTime = now
             val bitmap = image.toRgbaBitmap() ?: return
-            lastRotationDegrees = image.imageInfo.rotationDegrees
             synchronized(bitmapLock) {
-                if (inFlightBitmap != null) {
+                if (inFlightFrame != null) {
                     bitmap.recycle()
                     return
                 }
-                inFlightBitmap = bitmap
+                inFlightFrame = InFlightFrame(bitmap, image.imageInfo.rotationDegrees)
             }
-            val mpImage = BitmapImageBuilder(bitmap).build()
-            val processingOptions = ImageProcessingOptions.builder()
-                .setRotationDegrees(image.imageInfo.rotationDegrees)
-                .build()
             try {
+                val mpImage = BitmapImageBuilder(bitmap).build()
+                val processingOptions = ImageProcessingOptions.builder()
+                    .setRotationDegrees(image.imageInfo.rotationDegrees)
+                    .build()
                 landmarker.detectAsync(mpImage, processingOptions, now)
             } catch (exception: Exception) {
-                synchronized(bitmapLock) {
-                    if (inFlightBitmap === bitmap) inFlightBitmap = null
+                val ownsBitmap = synchronized(bitmapLock) {
+                    if (inFlightFrame?.bitmap === bitmap) {
+                        inFlightFrame = null
+                        true
+                    } else {
+                        false
+                    }
                 }
-                bitmap.recycle()
+                if (ownsBitmap) bitmap.recycle()
                 throw exception
             }
         } catch (exception: Exception) {
@@ -105,21 +115,16 @@ class FaceLandmarkAnalyzer(
     fun close() {
         if (!closed.compareAndSet(false, true)) return
         faceLandmarker?.close()
-        synchronized(bitmapLock) {
-            inFlightBitmap?.recycle()
-            inFlightBitmap = null
-        }
+        takeInFlightFrame()?.bitmap?.recycle()
     }
 
-    private fun recycleCompletedBitmap() {
-        synchronized(bitmapLock) {
-            inFlightBitmap?.recycle()
-            inFlightBitmap = null
-        }
+    private fun takeInFlightFrame(): InFlightFrame? = synchronized(bitmapLock) {
+        val frame = inFlightFrame
+        inFlightFrame = null
+        frame
     }
 
     private companion object {
-        const val MODEL_NAME = "face_landmarker.task"
         const val FACE_SAMPLE_INTERVAL_MS = 100L
         const val LIGHT_SAMPLE_INTERVAL_MS = 250L
     }
@@ -163,13 +168,14 @@ private fun createFaceLandmarker(
     context: Context,
     onLandmarksDetected: (FaceLandmarkerResult, Int) -> Unit,
     onError: (String) -> Unit,
-    onFrameCompleted: () -> Unit
+    takeInFlightFrame: () -> InFlightFrame?,
+    closed: AtomicBoolean
 ): FaceLandmarker? {
     fun options(delegate: Delegate): FaceLandmarker.FaceLandmarkerOptions =
         FaceLandmarker.FaceLandmarkerOptions.builder()
             .setBaseOptions(
                 BaseOptions.builder()
-                    .setModelAssetPath(FaceLandmarkAnalyzer.MODEL_NAME)
+                    .setModelAssetPath(FACE_LANDMARK_MODEL_NAME)
                     .setDelegate(delegate)
                     .build()
             )
@@ -178,12 +184,17 @@ private fun createFaceLandmarker(
             .setMinFaceDetectionConfidence(0.5f)
             .setMinTrackingConfidence(0.5f)
             .setResultListener { result, _ ->
-                onFrameCompleted()
-                onLandmarksDetected(result, lastRotationDegrees)
+                val frame = takeInFlightFrame()
+                frame?.bitmap?.recycle()
+                if (!closed.get()) {
+                    onLandmarksDetected(result, frame?.rotationDegrees ?: 0)
+                }
             }
             .setErrorListener { error ->
-                onFrameCompleted()
-                onError(error.message ?: "Face landmarking unavailable")
+                takeInFlightFrame()?.bitmap?.recycle()
+                if (!closed.get()) {
+                    onError(error.message ?: "Face landmarking unavailable")
+                }
             }
             .build()
 

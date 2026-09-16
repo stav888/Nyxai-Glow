@@ -15,11 +15,31 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.util.concurrent.Executor
+import java.util.concurrent.RejectedExecutionException
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 internal object RendererParameters {
     fun clampStrength(value: Float): Float = value.coerceIn(0f, 1f)
+}
+
+internal class RendererReleaseState {
+    @Volatile var requested = false
+        private set
+    @Volatile var resourcesReleased = false
+        private set
+
+    fun request(): Boolean {
+        if (requested) return false
+        requested = true
+        return true
+    }
+
+    fun markResourcesReleased(): Boolean {
+        if (resourcesReleased) return false
+        resourcesReleased = true
+        return true
+    }
 }
 
 class BeautyCameraRenderer(
@@ -45,10 +65,14 @@ class BeautyCameraRenderer(
     private var pendingRequest: SurfaceRequest? = null
     private var textureId = 0
     private var makeupTextureId = 0
+    private var pendingMaskBitmap: Bitmap? = null
+    private val releaseCallbacks = mutableListOf<() -> Unit>()
+    private val releaseState = RendererReleaseState()
     private var program = 0
     private var glowStrength = 0.68f
     private var smoothStrength = 0.2f
     private var released = false
+    private var glCleanupStarted = false
     private var updateTexture = false
     @Volatile
     private var requestRender: (() -> Unit)? = null
@@ -60,10 +84,8 @@ class BeautyCameraRenderer(
     private var makeupMaskLocation = -1
     private var texelSizeLocation = -1
     private var textureUniformLocation = -1
-    private var mirrorLocation = -1
     private var textureWidth = 640
     private var textureHeight = 480
-    private var mirrorFrontCamera = false
 
     fun setGlowStrength(value: Float) {
         synchronized(lock) { glowStrength = RendererParameters.clampStrength(value) }
@@ -73,17 +95,23 @@ class BeautyCameraRenderer(
         synchronized(lock) { smoothStrength = RendererParameters.clampStrength(value) }
     }
 
-    fun setFrontCamera(isFrontCamera: Boolean) {
-        synchronized(lock) { mirrorFrontCamera = isFrontCamera }
-    }
-
     fun updateMakeupMask(bitmap: Bitmap) {
         synchronized(lock) {
             if (released) {
                 bitmap.recycle()
                 return
             }
+            pendingMaskBitmap?.recycle()
+            pendingMaskBitmap = bitmap
         }
+    }
+
+    private fun uploadPendingMaskOnGlThread() {
+        val bitmap = synchronized(lock) {
+            val next = pendingMaskBitmap
+            pendingMaskBitmap = null
+            next
+        } ?: return
         if (makeupTextureId == 0) {
             val textures = IntArray(1)
             GLES20.glGenTextures(1, textures, 0)
@@ -124,11 +152,29 @@ class BeautyCameraRenderer(
     }
 
     fun release(onComplete: () -> Unit = {}) {
+        var completeNow = false
         synchronized(lock) {
-            if (released) return
-            released = true
-            pendingRequest?.willNotProvideSurface()
-            pendingRequest = null
+            completeNow = releaseState.resourcesReleased
+            if (!completeNow) releaseCallbacks += onComplete
+            if (!released) {
+                released = true
+                pendingRequest?.willNotProvideSurface()
+                pendingRequest = null
+            }
+        }
+        if (completeNow) {
+            executeCallbackSafely(onComplete)
+        }
+    }
+
+    fun releaseGlResources() {
+        // Must only be called from GLSurfaceView.Renderer callbacks or queueEvent.
+        val callbacks: List<() -> Unit>
+        synchronized(lock) {
+            if (glCleanupStarted) return
+            glCleanupStarted = true
+            pendingMaskBitmap?.recycle()
+            pendingMaskBitmap = null
             cameraSurface?.release()
             cameraSurface = null
             surfaceTexture?.release()
@@ -145,8 +191,11 @@ class BeautyCameraRenderer(
                 GLES20.glDeleteProgram(program)
                 program = 0
             }
+            releaseState.markResourcesReleased()
+            callbacks = releaseCallbacks.toList()
+            releaseCallbacks.clear()
         }
-        callbackExecutor.execute(onComplete)
+        callbacks.forEach(::executeCallbackSafely)
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -170,15 +219,14 @@ class BeautyCameraRenderer(
             textureCoordLocation = GLES20.glGetAttribLocation(program, "aTextureCoord")
             textureMatrixLocation = GLES20.glGetUniformLocation(program, "uTextureMatrix")
             textureUniformLocation = GLES20.glGetUniformLocation(program, "uTexture")
-            mirrorLocation = GLES20.glGetUniformLocation(program, "uMirrorX")
             glowLocation = GLES20.glGetUniformLocation(program, "uGlowStrength")
             smoothLocation = GLES20.glGetUniformLocation(program, "uSmoothStrength")
             makeupMaskLocation = GLES20.glGetUniformLocation(program, "uMakeupMask")
             texelSizeLocation = GLES20.glGetUniformLocation(program, "uTexelSize")
-            updateMakeupMask(Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888))
+            uploadPendingMaskOnGlThread()
             synchronized(lock) { providePendingRequestLocked() }
         } catch (exception: Exception) {
-            callbackExecutor.execute { onSurfaceError("Renderer initialization failed: ${exception.message}") }
+            executeCallbackSafely { onSurfaceError("Renderer initialization failed: ${exception.message}") }
         }
     }
 
@@ -197,6 +245,7 @@ class BeautyCameraRenderer(
             }
         }
         if (program == 0) return
+        uploadPendingMaskOnGlThread()
         GLES20.glUseProgram(program)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
@@ -204,16 +253,13 @@ class BeautyCameraRenderer(
         val currentSmooth: Float
         val currentWidth: Int
         val currentHeight: Int
-        val currentMirror: Boolean
         synchronized(lock) {
             currentGlow = glowStrength
             currentSmooth = smoothStrength
             currentWidth = textureWidth
             currentHeight = textureHeight
-            currentMirror = mirrorFrontCamera
         }
         GLES20.glUniform1i(textureUniformLocation, 0)
-        GLES20.glUniform1f(mirrorLocation, if (currentMirror) 1f else 0f)
         GLES20.glUniform1f(glowLocation, currentGlow)
         GLES20.glUniform1f(smoothLocation, currentSmooth)
         GLES20.glUniform2f(texelSizeLocation, 1f / currentWidth, 1f / currentHeight)
@@ -233,8 +279,11 @@ class BeautyCameraRenderer(
     }
 
     override fun onFrameAvailable(surfaceTexture: SurfaceTexture?) {
-        synchronized(this) { updateTexture = true }
-        val callback = synchronized(lock) { if (released) null else requestRender }
+        val callback = synchronized(lock) {
+            if (released) return@synchronized null
+            synchronized(this) { updateTexture = true }
+            requestRender
+        }
         callback?.invoke()
     }
 
@@ -245,10 +294,18 @@ class BeautyCameraRenderer(
         request.provideSurface(surface, callbackExecutor) { result ->
             val isReleased = synchronized(lock) { released }
             if (!isReleased && result.resultCode != SurfaceRequest.Result.RESULT_SURFACE_USED_SUCCESSFULLY) {
-                callbackExecutor.execute {
+                executeCallbackSafely {
                     onSurfaceError("Camera surface ended: ${result.resultCode}")
                 }
             }
+        }
+    }
+
+    private fun executeCallbackSafely(callback: () -> Unit) {
+        try {
+            callbackExecutor.execute(callback)
+        } catch (_: RejectedExecutionException) {
+            callback()
         }
     }
 
@@ -297,14 +354,12 @@ class BeautyCameraRenderer(
             attribute vec4 aPosition;
             attribute vec2 aTextureCoord;
             uniform mat4 uTextureMatrix;
-            uniform float uMirrorX;
             varying vec2 vTextureCoord;
             void main() {
                 gl_Position = aPosition;
-                vec2 cameraCoord = aTextureCoord;
-                if (uMirrorX > 0.5) cameraCoord.x = 1.0 - cameraCoord.x;
-                vTextureCoord = (uTextureMatrix * vec4(cameraCoord, 0.0, 1.0)).xy;
+                vTextureCoord = (uTextureMatrix * vec4(aTextureCoord, 0.0, 1.0)).xy;
             }
         """
     }
+
 }
