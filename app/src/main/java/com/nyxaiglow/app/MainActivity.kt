@@ -18,8 +18,6 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
-import androidx.camera.core.ResolutionSelector
-import androidx.camera.core.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -210,6 +208,7 @@ private fun GlowStudio() {
                     capturedUri = uri
                     statusMessage = "Photo captured"
                 },
+                onCaptureCancelled = { captureLock.set(false) },
                 onCameraError = {
                     captureLock.set(false)
                     statusMessage = it
@@ -437,6 +436,7 @@ private fun CameraPreview(
     onAmbient: (Float) -> Unit,
     onLandmarksDetected: (FaceLandmarkerResult, Int) -> Unit,
     onCapture: (Uri) -> Unit,
+    onCaptureCancelled: () -> Unit,
     onCameraError: (String) -> Unit,
     onFlashAvailabilityChanged: (Boolean) -> Unit
 ) {
@@ -475,16 +475,9 @@ private fun CameraPreview(
                 return@addListener
             }
             localProvider = provider
-            val analysisResolution = ResolutionSelector.Builder()
-                .setResolutionStrategy(
-                    ResolutionStrategy(
-                        Size(640, 480),
-                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
-                    )
-                )
-                .build()
+            val analysisResolution = Size(640, 480)
             val preview = Preview.Builder()
-                .setResolutionSelector(analysisResolution)
+                .setTargetResolution(analysisResolution)
                 .build()
                 .also { it.setSurfaceProvider(renderer::provideSurfaceRequest) }
             val analyzer = FaceLandmarkAnalyzer(
@@ -514,7 +507,7 @@ private fun CameraPreview(
             }
             val analysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setResolutionSelector(analysisResolution)
+                .setTargetResolution(analysisResolution)
                 .build()
                 .also { it.setAnalyzer(executor, analyzer) }
             localAnalysis = analysis
@@ -546,17 +539,21 @@ private fun CameraPreview(
     }
 
     DisposableEffect(Unit) {
-        onDispose { executor.shutdown() }
+        onDispose {
+            onCaptureCancelled()
+            executor.shutdown()
+        }
     }
 
     DisposableEffect(Unit) {
         renderer.setRenderRequest { glView.requestRender() }
         onDispose {
             renderer.setRenderRequest(null)
-            renderer.release {
+            renderer.release()
+            glView.queueEvent {
+                renderer.releaseGlResources()
                 glView.onPause()
             }
-            glView.queueEvent { renderer.releaseGlResources() }
         }
     }
 

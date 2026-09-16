@@ -34,7 +34,12 @@ class MakeupMaskGenerator {
         }
 
         paint.color = Color.argb(205, 255, 0, 0)
-        drawPolygon(CoordinateConverter.validIndices(LIP_INDICES, landmarks.size).mapNotNull(::point))
+        drawPolygon(
+            CoordinateConverter
+                .validIndices(LIP_INDICES, landmarks.size)
+                .asList()
+                .mapNotNull(::point)
+        )
 
         paint.color = Color.argb(145, 0, 255, 0)
         point(116)?.let { drawFeatheredCircle(it.first, it.second) }

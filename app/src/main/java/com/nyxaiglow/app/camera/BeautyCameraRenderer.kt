@@ -1,6 +1,7 @@
 package com.nyxaiglow.app.camera
 
 import android.content.Context
+import android.graphics.Color
 import android.graphics.SurfaceTexture
 import android.graphics.Bitmap
 import android.opengl.GLES11Ext
@@ -112,6 +113,10 @@ class BeautyCameraRenderer(
             pendingMaskBitmap = null
             next
         } ?: return
+        uploadMaskBitmapOnGlThread(bitmap)
+    }
+
+    private fun uploadMaskBitmapOnGlThread(bitmap: Bitmap) {
         if (makeupTextureId == 0) {
             val textures = IntArray(1)
             GLES20.glGenTextures(1, textures, 0)
@@ -129,6 +134,12 @@ class BeautyCameraRenderer(
         } finally {
             bitmap.recycle()
         }
+    }
+
+    private fun initializeTransparentMaskOnGlThread() {
+        val emptyMask = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        emptyMask.eraseColor(Color.TRANSPARENT)
+        uploadMaskBitmapOnGlThread(emptyMask)
     }
 
     fun setRenderRequest(callback: (() -> Unit)?) {
@@ -223,6 +234,7 @@ class BeautyCameraRenderer(
             smoothLocation = GLES20.glGetUniformLocation(program, "uSmoothStrength")
             makeupMaskLocation = GLES20.glGetUniformLocation(program, "uMakeupMask")
             texelSizeLocation = GLES20.glGetUniformLocation(program, "uTexelSize")
+            initializeTransparentMaskOnGlThread()
             uploadPendingMaskOnGlThread()
             synchronized(lock) { providePendingRequestLocked() }
         } catch (exception: Exception) {
