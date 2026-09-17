@@ -3,6 +3,7 @@ package com.nyxiaglow.app.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +52,9 @@ private val Coral = Color(0xFFFF9A8B)
 private val CoralDeep = Color(0xFF96463B)
 private val SurfaceDark = Color(0xFF171515)
 private val SurfaceRaised = Color(0xFF242020)
+private val Ink = Color(0xFF0E0E0E)
+private val CoralSoft = Color(0xFFFFC2B9)
+private val TextMuted = Color(0xFFDAC1BD)
 
 @Composable
 fun RetouchScreen(
@@ -64,95 +69,95 @@ fun RetouchScreen(
     onReset: () -> Unit,
     onApply: () -> Unit
 ) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(SurfaceDark)
-            .padding(start = 16.dp, top = 72.dp, end = 16.dp, bottom = 104.dp),
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column {
+    BoxWithConstraints(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(SurfaceDark, Ink)))) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, top = 22.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("AI CORE V2.4 ACTIVE", color = Color.White.copy(alpha = .78f), fontSize = 10.sp, letterSpacing = 1.sp)
-                Surface(color = SurfaceRaised, shape = RoundedCornerShape(50)) {
-                    Text("HOLD BEFORE", color = Color.White, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                Column {
+                    Text("RETOUCH CONTROL DECK", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Medium, letterSpacing = .9.sp)
+                    Text("Tactile studio drawer", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Surface(color = Coral.copy(alpha = .16f), shape = RoundedCornerShape(50)) {
+                    Text("AI CORE V2.4", color = CoralSoft, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp))
                 }
             }
-            Spacer(Modifier.height(18.dp))
-            Surface(color = Color.Black.copy(alpha = .34f), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().height(310.dp)) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    RetouchGlowReticle(Modifier.size(172.dp), .72f, .62f)
-                    Text("98.4% NATURAL MATCH", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.TopCenter).padding(top = 18.dp))
+            Surface(color = Color.Black.copy(alpha = .28f), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().weight(1f).heightIn(min = 220.dp, max = 290.dp)) {
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxWidth().height(90.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .7f), Color.Transparent))))
+                    Row(Modifier.align(Alignment.TopCenter).padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TelemetryPill("98.4% NATURAL MATCH")
+                        TelemetryPill("LIVE")
+                    }
+                    RetouchGlowReticle(Modifier.align(Alignment.Center).size(164.dp), .72f, .62f)
+                    Text("HOLD BEFORE", color = TextMuted, fontSize = 10.sp, letterSpacing = .6.sp, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp))
                 }
             }
-            Spacer(Modifier.height(18.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 RetouchTool("Skin", Icons.Default.AutoAwesome, selectedTool == "Skin") { onToolSelected("Skin") }
                 RetouchTool("Shape", Icons.Default.PhotoLibrary, selectedTool == "Shape") { onToolSelected("Shape") }
                 RetouchTool("Light", Icons.Default.FlashOn, selectedTool == "Light") { onToolSelected("Light") }
                 RetouchTool("Makeup", Icons.Default.Palette, selectedTool == "Makeup") { onToolSelected("Makeup") }
             }
-            Spacer(Modifier.height(18.dp))
-            Text("PRESETS & TONE", color = Color.White.copy(alpha = .64f), fontSize = 10.sp, letterSpacing = 1.sp)
-            Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(listOf("Smooth", "Freckles", "Matte", "Dewy", "Refine")) { item ->
-                    Surface(
-                        color = if (item == selectedPreset) Coral else SurfaceRaised,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .clickable(role = Role.Button) { onPresetSelected(item) }
-                            .semantics {
-                                selected = item == selectedPreset
-                                stateDescription = if (item == selectedPreset) "Selected" else "Not selected"
+            Column(Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("PRESETS & TONE", color = TextMuted, fontSize = 10.sp, letterSpacing = .8.sp)
+                    Text("SWIPE TO EXPLORE", color = CoralSoft, fontSize = 9.sp, letterSpacing = .5.sp)
+                }
+                Spacer(Modifier.height(7.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(listOf("Smooth", "Freckles", "Matte", "Dewy", "Refine")) { item ->
+                        val selected = item == selectedPreset
+                        Surface(
+                            color = if (selected) Coral else SurfaceRaised,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.clickable(role = Role.Button) { onPresetSelected(item) }.semantics {
+                                this.selected = selected
+                                stateDescription = if (selected) "Selected" else "Not selected"
                             }
-                    ) {
-                        Column(Modifier.width(58.dp).padding(7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(if (item == selectedPreset) CoralDeep else Color(0xFF3B3331)))
-                            Spacer(Modifier.height(5.dp))
-                            Text(item, color = if (item == selectedPreset) CoralDeep else Color.White, fontSize = 9.sp)
+                        ) {
+                            Column(Modifier.width(58.dp).padding(7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(if (selected) CoralDeep else Color(0xFF3B3331)))
+                                Spacer(Modifier.height(5.dp))
+                                Text(item, color = if (selected) CoralDeep else Color.White, fontSize = 9.sp)
+                            }
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(18.dp))
-            Text("Smoothing intensity", color = Color.White, fontSize = 12.sp)
-            Slider(
-                value = smoothingIntensity,
-                onValueChange = onSmoothingChange,
-                valueRange = 0f..1f,
-                modifier = Modifier.semantics {
-                    stateDescription = "Smoothing intensity ${(smoothingIntensity * 100).toInt()} percent"
-                },
-                colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Coral, activeTrackColor = Coral, inactiveTrackColor = SurfaceRaised)
-            )
-            Surface(
-                color = SurfaceRaised,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(role = Role.Switch, onClick = onTextureToggle)
-                    .semantics {
-                        stateDescription = if (preserveTexture) "On" else "Off"
-                    }
-            ) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("SMOOTHING INTENSITY", color = TextMuted, fontSize = 10.sp, letterSpacing = .7.sp)
+                Text("${(smoothingIntensity * 100).toInt()}%", color = CoralSoft, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Slider(value = smoothingIntensity, onValueChange = onSmoothingChange, valueRange = 0f..1f, modifier = Modifier.semantics {
+                stateDescription = "Smoothing intensity ${(smoothingIntensity * 100).toInt()} percent"
+            }, colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Coral, activeTrackColor = Coral, inactiveTrackColor = SurfaceRaised))
+            Surface(color = SurfaceRaised.copy(alpha = .9f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().clickable(role = Role.Switch, onClick = onTextureToggle).semantics {
+                stateDescription = if (preserveTexture) "On" else "Off"
+            }) {
+                Row(Modifier.padding(horizontal = 13.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        Text("Subtle Micro-Texture", color = Color.White, fontSize = 12.sp)
-                        Text("Preserves natural pores & grain", color = Color.White.copy(alpha = .58f), fontSize = 10.sp)
+                        Text("Subtle Micro-Texture", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Preserves natural pores & grain", color = TextMuted, fontSize = 10.sp)
                     }
-                    Text(if (preserveTexture) "ON" else "OFF", color = if (preserveTexture) Coral else Color.White.copy(alpha = .5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(if (preserveTexture) "ON" else "OFF", color = if (preserveTexture) CoralSoft else TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = onReset, colors = ButtonDefaults.buttonColors(containerColor = SurfaceRaised, contentColor = Color.White), modifier = Modifier.weight(1f)) {
-                Text("RESET", fontSize = 11.sp)
-            }
-            Button(onClick = onApply, colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = CoralDeep), modifier = Modifier.weight(2f)) {
-                Text("APPLY TO PREVIEW", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onReset, colors = ButtonDefaults.buttonColors(containerColor = SurfaceRaised, contentColor = Color.White), modifier = Modifier.weight(1f)) { Text("RESET", fontSize = 11.sp) }
+                Button(onClick = onApply, colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = CoralDeep), modifier = Modifier.weight(2f)) { Text("APPLY TO PREVIEW", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             }
         }
+    }
+}
+
+@Composable
+private fun TelemetryPill(label: String) {
+    Surface(color = Ink.copy(alpha = .72f), shape = RoundedCornerShape(50)) {
+        Text(label, color = if (label == "LIVE") CoralSoft else Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = .45.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
     }
 }
 
