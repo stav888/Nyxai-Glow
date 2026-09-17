@@ -14,11 +14,18 @@ class MakeupMaskGenerator {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
-    private val maskBitmap = Bitmap.createBitmap(MASK_WIDTH, MASK_HEIGHT, Bitmap.Config.ARGB_8888)
-    private val canvas = Canvas(maskBitmap)
+    private var maskBitmap = Bitmap.createBitmap(DEFAULT_MASK_WIDTH, DEFAULT_MASK_HEIGHT, Bitmap.Config.ARGB_8888)
+    private var canvas = Canvas(maskBitmap)
 
     @Synchronized
-    fun generateMask(result: FaceLandmarkerResult, rotationDegrees: Int = 0, mirrorX: Boolean = false): Bitmap {
+    fun generateMask(
+        result: FaceLandmarkerResult,
+        rotationDegrees: Int = 0,
+        mirrorX: Boolean = false,
+        width: Int = DEFAULT_MASK_WIDTH,
+        height: Int = DEFAULT_MASK_HEIGHT
+    ): Bitmap {
+        ensureSize(width, height)
         // MediaPipe image coordinates are rotated and optionally mirrored here once.
         // The renderer samples the camera texture without an additional mirror.
         canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
@@ -30,7 +37,7 @@ class MakeupMaskGenerator {
             if (index !in landmarks.indices) return null
             val landmark = landmarks[index]
             val normalized = CoordinateConverter.fromRotatedImage(landmark.x(), landmark.y(), rotationDegrees, mirrorX)
-            return (normalized.first * MASK_WIDTH) to (normalized.second * MASK_HEIGHT)
+            return (normalized.first * maskBitmap.width) to (normalized.second * maskBitmap.height)
         }
 
         paint.color = Color.argb(205, 255, 0, 0)
@@ -46,6 +53,30 @@ class MakeupMaskGenerator {
         point(345)?.let { drawFeatheredCircle(it.first, it.second) }
 
         return Bitmap.createBitmap(maskBitmap)
+    }
+
+    companion object {
+        fun hasVisiblePixels(bitmap: Bitmap): Boolean {
+            val pixels = IntArray(bitmap.width * bitmap.height)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+            return pixels.any { Color.alpha(it) != 0 }
+        }
+
+        const val DEFAULT_MASK_WIDTH = 640
+        const val DEFAULT_MASK_HEIGHT = 480
+        private val LIP_INDICES = intArrayOf(
+            61, 185, 40, 39, 37, 0, 267, 269, 270, 409,
+            291, 375, 321, 405, 314, 17, 84, 181, 91, 146
+        )
+    }
+
+    private fun ensureSize(width: Int, height: Int) {
+        val safeWidth = width.coerceAtLeast(1)
+        val safeHeight = height.coerceAtLeast(1)
+        if (maskBitmap.width == safeWidth && maskBitmap.height == safeHeight) return
+        maskBitmap.recycle()
+        maskBitmap = Bitmap.createBitmap(safeWidth, safeHeight, Bitmap.Config.ARGB_8888)
+        canvas = Canvas(maskBitmap)
     }
 
     private fun drawPolygon(points: List<Pair<Float, Float>>) {
@@ -89,13 +120,4 @@ class MakeupMaskGenerator {
         }
     }
 
-    private companion object {
-        // Matches the shared CameraX preview/analysis resolution.
-        const val MASK_WIDTH = 640
-        const val MASK_HEIGHT = 480
-        val LIP_INDICES = intArrayOf(
-            61, 185, 40, 39, 37, 0, 267, 269, 270, 409,
-            291, 375, 321, 405, 314, 17, 84, 181, 91, 146
-        )
-    }
 }

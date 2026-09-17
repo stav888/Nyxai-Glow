@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import android.util.Size
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -476,6 +477,9 @@ private fun CameraPreview(
             }
             localProvider = provider
             val analysisResolution = Size(640, 480)
+            var previousLandmarks: FloatArray? = null
+            var hadFace = false
+            var lastDebugFaceState: Boolean? = null
             val preview = Preview.Builder()
                 .setTargetResolution(analysisResolution)
                 .build()
@@ -483,18 +487,49 @@ private fun CameraPreview(
             val analyzer = FaceLandmarkAnalyzer(
                 context = context,
                 onLandmarksDetected = { result, rotationDegrees ->
-                    val mask = maskGenerator.generateMask(
-                        result,
-                        rotationDegrees = rotationDegrees,
-                        mirrorX = lensFacing == CameraSelector.LENS_FACING_FRONT
-                    )
-                    if (disposed.get()) {
-                        mask.recycle()
-                    } else {
-                        glView.queueEvent { renderer.updateMakeupMask(mask) }
-                        glView.requestRender()
-                        onLandmarksDetected(result, rotationDegrees)
+                    val landmarks = result.faceLandmarks().firstOrNull()
+                    if (BuildConfig.DEBUG && lastDebugFaceState != (landmarks != null)) {
+                        lastDebugFaceState = landmarks != null
+                        Log.d("CameraPreview", "Face Landmarker result: face=${landmarks != null}")
                     }
+                    if (landmarks == null) {
+                        previousLandmarks = null
+                        if (hadFace) {
+                            hadFace = false
+                            glView.queueEvent { renderer.clearMakeupMask() }
+                            glView.requestRender()
+                        }
+                    } else {
+                        val currentLandmarks = FloatArray(landmarks.size * 2) { index ->
+                            if (index % 2 == 0) landmarks[index / 2].x() else landmarks[index / 2].y()
+                        }
+                        val changed = previousLandmarks == null || LandmarkChangeDetector.changed(previousLandmarks!!, currentLandmarks)
+                        previousLandmarks = currentLandmarks
+                        if (changed) {
+                            val previewSize = renderer.currentTextureSize()
+                            val mask = maskGenerator.generateMask(
+                                result,
+                                rotationDegrees = rotationDegrees,
+                                mirrorX = lensFacing == CameraSelector.LENS_FACING_FRONT,
+                                width = previewSize.width,
+                                height = previewSize.height
+                            )
+                            if (!MakeupMaskGenerator.hasVisiblePixels(mask)) {
+                                if (BuildConfig.DEBUG) Log.d("CameraPreview", "Generated makeup mask is empty")
+                                mask.recycle()
+                                glView.queueEvent { renderer.clearMakeupMask() }
+                                glView.requestRender()
+                            } else if (disposed.get()) {
+                                mask.recycle()
+                            } else {
+                                if (BuildConfig.DEBUG) Log.d("CameraPreview", "Generated makeup mask: ${previewSize.width}x${previewSize.height}")
+                                glView.queueEvent { renderer.updateMakeupMask(mask) }
+                                glView.requestRender()
+                            }
+                        }
+                        hadFace = true
+                    }
+                    onLandmarksDetected(result, rotationDegrees)
                 },
                 onLightChanged = { if (!disposed.get()) onAmbient(it) },
                 onError = { if (!disposed.get()) onCameraError(it) }
@@ -529,19 +564,14 @@ private fun CameraPreview(
             disposed.set(true)
             camera = null
             onFlashAvailabilityChanged(false)
+            glView.queueEvent { renderer.clearMakeupMask() }
+            glView.requestRender()
             localAnalysis?.clearAnalyzer()
             localProvider?.unbindAll()
             localAnalyzer?.let { analyzer ->
                 localAnalyzer = null
                 analyzer.close()
             }
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            onCaptureCancelled()
-            executor.shutdown()
         }
     }
 
@@ -554,6 +584,8 @@ private fun CameraPreview(
                 renderer.releaseGlResources()
                 glView.onPause()
             }
+            onCaptureCancelled()
+            executor.shutdown()
         }
     }
 

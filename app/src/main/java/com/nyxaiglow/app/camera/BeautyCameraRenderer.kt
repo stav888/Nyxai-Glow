@@ -8,6 +8,7 @@ import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
+import android.util.Log
 import android.util.Size
 import android.view.Surface
 import androidx.camera.core.SurfaceRequest
@@ -67,6 +68,7 @@ class BeautyCameraRenderer(
     private var textureId = 0
     private var makeupTextureId = 0
     private var pendingMaskBitmap: Bitmap? = null
+    private var maskIsClear = true
     private val releaseCallbacks = mutableListOf<() -> Unit>()
     private val releaseState = RendererReleaseState()
     private var program = 0
@@ -83,6 +85,7 @@ class BeautyCameraRenderer(
     private var glowLocation = -1
     private var smoothLocation = -1
     private var makeupMaskLocation = -1
+    private var hasLoggedMaskUpload = false
     private var texelSizeLocation = -1
     private var textureUniformLocation = -1
     private var textureWidth = 640
@@ -104,7 +107,23 @@ class BeautyCameraRenderer(
             }
             pendingMaskBitmap?.recycle()
             pendingMaskBitmap = bitmap
+            maskIsClear = false
         }
+    }
+
+    fun clearMakeupMask() {
+        synchronized(lock) {
+            if (released || (maskIsClear && pendingMaskBitmap == null)) return
+            pendingMaskBitmap?.recycle()
+            val emptyMask = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+            emptyMask.eraseColor(Color.TRANSPARENT)
+            pendingMaskBitmap = emptyMask
+            maskIsClear = true
+        }
+    }
+
+    fun currentTextureSize(): Size = synchronized(lock) {
+        Size(textureWidth, textureHeight)
     }
 
     private fun uploadPendingMaskOnGlThread() {
@@ -131,6 +150,10 @@ class BeautyCameraRenderer(
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, makeupTextureId)
         try {
             GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+            if (!hasLoggedMaskUpload && com.nyxaiglow.app.BuildConfig.DEBUG) {
+                hasLoggedMaskUpload = true
+                Log.d("BeautyCameraRenderer", "Makeup mask texture uploaded")
+            }
         } finally {
             bitmap.recycle()
         }
@@ -140,6 +163,7 @@ class BeautyCameraRenderer(
         val emptyMask = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         emptyMask.eraseColor(Color.TRANSPARENT)
         uploadMaskBitmapOnGlThread(emptyMask)
+        synchronized(lock) { maskIsClear = true }
     }
 
     fun setRenderRequest(callback: (() -> Unit)?) {

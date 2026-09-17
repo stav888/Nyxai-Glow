@@ -44,6 +44,15 @@ class CameraVisualSafetyTest {
     }
 
     @Test
+    fun landmarkChangeThresholdIgnoresSmallMotion() {
+        val previous = floatArrayOf(.2f, .3f, .4f, .5f)
+        val unchanged = floatArrayOf(.202f, .298f, .4f, .5f)
+        val changed = floatArrayOf(.204f, .3f, .4f, .5f)
+        assertTrue(!LandmarkChangeDetector.changed(previous, unchanged))
+        assertTrue(LandmarkChangeDetector.changed(previous, changed))
+    }
+
+    @Test
     fun shaderParametersAreClamped() {
         assertEquals(0f, RendererParameters.clampStrength(-1f), .0001f)
         assertEquals(1f, RendererParameters.clampStrength(2f), .0001f)
