@@ -1,4 +1,4 @@
-package com.nyxaiglow.app.camera
+package com.nyxiaglow.app.camera
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -99,11 +99,11 @@ class FaceLandmarkAnalyzer(
         var sum = 0L
         var samples = 0
         for (row in 0 until rows) {
-            val y = row * image.height / rows
+            val y = (row * image.height / rows).coerceIn(0, image.height - 1)
             for (column in 0 until columns) {
-                val x = column * image.width / columns
+                val x = (column * image.width / columns).coerceIn(0, image.width - 1)
                 val offset = buffer.position() + y * plane.rowStride + x * plane.pixelStride
-                if (offset < buffer.limit()) {
+                if (offset >= buffer.position() && offset < buffer.limit()) {
                     sum += buffer.get(offset).toInt() and 0xFF
                     samples++
                 }
@@ -184,11 +184,9 @@ private fun createFaceLandmarker(
             .setMinFaceDetectionConfidence(0.5f)
             .setMinTrackingConfidence(0.5f)
             .setResultListener { result, _ ->
-                val frame = takeInFlightFrame()
-                frame?.bitmap?.recycle()
-                if (!closed.get()) {
-                    onLandmarksDetected(result, frame?.rotationDegrees ?: 0)
-                }
+                val frame = takeInFlightFrame() ?: return@setResultListener
+                frame.bitmap.recycle()
+                if (!closed.get()) onLandmarksDetected(result, frame.rotationDegrees)
             }
             .setErrorListener { error ->
                 takeInFlightFrame()?.bitmap?.recycle()

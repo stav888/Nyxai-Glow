@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Nyxai Glow"
+rootProject.name = "Nyxia Glow"
 include(":app")

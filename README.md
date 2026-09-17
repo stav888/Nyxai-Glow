@@ -1,6 +1,6 @@
-# Nyxai Glow
+# Nyxia Glow
 
-Nyxai Glow is a native Android camera studio built with Kotlin, Jetpack Compose, CameraX, and MediaPipe Tasks Vision. It provides a live camera preview with front/rear switching, zoom, hardware-aware torch control, ambient-light guidance, beauty preset state, texture-preservation state, gallery picking, and MediaStore photo capture.
+Nyxia Glow is a native Android camera studio built with Kotlin, Jetpack Compose, CameraX, and MediaPipe Tasks Vision. It provides a live camera preview with front/rear switching, zoom, hardware-aware torch control, ambient-light guidance, beauty preset state, texture-preservation state, gallery picking, and MediaStore photo capture.
 
 ## Current scope
 
@@ -42,24 +42,24 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 ```powershell
 adb devices
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n com.nyxaiglow.app/.MainActivity
+adb shell am start -n com.nyxiaglow.app/.MainActivity
 ```
 
 To inspect launch and camera errors:
 
 ```powershell
 adb logcat -c
-adb shell am force-stop com.nyxaiglow.app
-adb shell am start -n com.nyxaiglow.app/.MainActivity
-adb logcat -d | Select-String "FATAL EXCEPTION|AndroidRuntime|com.nyxaiglow.app"
+adb shell am force-stop com.nyxiaglow.app
+adb shell am start -n com.nyxiaglow.app/.MainActivity
+adb logcat -d | Select-String "FATAL EXCEPTION|AndroidRuntime|com.nyxiaglow.app"
 ```
 
 ## Repository guide
 
-- `app/src/main/java/com/nyxaiglow/app/MainActivity.kt`: Compose UI, permissions, CameraX binding, capture, and controls.
-- `app/src/main/java/com/nyxaiglow/app/camera/FaceLandmarkAnalyzer.kt`: ambient-light sampling, YUV conversion, and MediaPipe face landmarks.
-- `app/src/main/java/com/nyxaiglow/app/camera/LightingState.kt`: pure ambient-light label mapping.
-- `app/src/test/java/com/nyxaiglow/app/camera/LightingStateTest.kt`: lighting boundary tests.
+- `app/src/main/java/com/nyxiaglow/app/MainActivity.kt`: Compose UI, permissions, CameraX binding, capture, and controls.
+- `app/src/main/java/com/nyxiaglow/app/camera/FaceLandmarkAnalyzer.kt`: ambient-light sampling, YUV conversion, and MediaPipe face landmarks.
+- `app/src/main/java/com/nyxiaglow/app/camera/LightingState.kt`: pure ambient-light label mapping.
+- `app/src/test/java/com/nyxiaglow/app/camera/LightingStateTest.kt`: lighting boundary tests.
 - `app/src/main/assets/face_landmarker.task`: MediaPipe Face Landmarker model.
 - `app_edit.md`: detailed implementation and UI reference.
 

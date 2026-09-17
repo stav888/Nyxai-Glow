@@ -1,15 +1,23 @@
-name: Android build
+name: Android build and test
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  unit-lint-build:
+    name: Unit tests, lint, and APK builds
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -17,59 +25,124 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
+          cache: gradle
       - name: Set up Android SDK
-        id: android_sdk
         uses: android-actions/setup-android@v3
         with:
           packages: >-
             platform-tools
             platforms;android-35
             build-tools;35.0.0
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
       - name: Run unit tests
-        if: always() && steps.android_sdk.outcome == 'success'
         run: ./gradlew --no-daemon testDebugUnitTest
       - name: Run lint
-        if: always() && steps.android_sdk.outcome == 'success'
         run: ./gradlew --no-daemon lintDebug
       - name: Assemble debug APK
-        if: always() && steps.android_sdk.outcome == 'success'
         run: ./gradlew --no-daemon assembleDebug
       - name: Assemble release APK
-        if: always() && steps.android_sdk.outcome == 'success'
         run: ./gradlew --no-daemon assembleRelease
-      - name: Upload test reports
+      - name: Upload unit-test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports
+          name: unit-test-reports
           path: app/build/reports/tests/
-      - name: Upload APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
       - name: Upload lint reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lint-reports
-          path: app/build/reports/lint-results-*.html
+          path: |
+            app/build/reports/lint-results*
+            app/build/reports/lint-results/**/*.html
+          if-no-files-found: ignore
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nyxia-glow-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
       - name: Upload release APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
+          name: nyxia-glow-release-apk
           path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+  instrumented-tests:
+    name: Instrumented Android tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: >-
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
+            system-images;android-35;google_apis;x86_64
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses || true
+      - name: Create emulator
+        run: |
+          echo "no" | avdmanager create avd \
+            --force \
+            --name test-api-35 \
+            --package "system-images;android-35;google_apis;x86_64" \
+            --device "pixel_2"
+      - name: Start emulator
+        run: |
+          "$ANDROID_HOME/emulator/emulator" \
+            -avd test-api-35 \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -gpu swiftshader_indirect \
+            > /tmp/emulator.log 2>&1 &
+      - name: Wait for emulator
+        run: |
+          adb wait-for-device
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          boot_completed=""
+          until [ "$boot_completed" = "1" ]; do
+            boot_completed=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            sleep 5
+          done
+      - name: Run instrumented tests
+        run: ./gradlew --no-daemon connectedDebugAndroidTest
+      - name: Upload instrumented-test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-reports
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          if-no-files-found: ignore
+      - name: Upload emulator log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-log
+          path: /tmp/emulator.log
+          if-no-files-found: ignore

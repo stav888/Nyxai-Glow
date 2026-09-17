@@ -1,11 +1,11 @@
-package com.nyxaiglow.app.ui.theme
+package com.nyxiaglow.app.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val NyxaiColors = darkColorScheme(
+private val NyxiaColors = darkColorScheme(
     primary = Color(0xFFE7B46A),
     onPrimary = Color(0xFF2D1900),
     secondary = Color(0xFF9ED1C4),
@@ -18,9 +18,9 @@ private val NyxaiColors = darkColorScheme(
 )
 
 @Composable
-fun NyxaiGlowTheme(content: @Composable () -> Unit) {
+fun NyxiaGlowTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = NyxaiColors,
+        colorScheme = NyxiaColors,
         content = content
     )
 }

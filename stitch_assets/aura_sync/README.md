@@ -15,6 +15,6 @@ The `screenshots` directory contains the downloadable Stitch screenshot for each
 | AuraSync - Retouch Dashboard | `ac60f6e196994dabbe2dce7046f0e8aa` | `screenshots/ac60f6e196994dabbe2dce7046f0e8aa.png` | `code/ac60f6e196994dabbe2dce7046f0e8aa.html` |
 | AuraSync - Texture Preserve Control | `ec708f6995f842cb9adce1f70006e85a` | `screenshots/ec708f6995f842cb9adce1f70006e85a.png` | `code/ec708f6995f842cb9adce1f70006e85a.html` |
 | AuraSync - Adaptive Glow Control | `53bc9ff093924538ae690d939b51ae8a` | `screenshots/53bc9ff093924538ae690d939b51ae8a.png` | `code/53bc9ff093924538ae690d939b51ae8a.html` |
-| Nyxai-Glow Logo | `4f6377aea3144eb292e5dc024dbfa1a4` | `screenshots/4f6377aea3144eb292e5dc024dbfa1a4.png` | unavailable |
+| Nyxia-Glow Logo | `4f6377aea3144eb292e5dc024dbfa1a4` | `screenshots/4f6377aea3144eb292e5dc024dbfa1a4.png` | unavailable |
 
 The HTML exports may reference additional hosted image URLs from Stitch. The files were downloaded on 2026-09-14 from the project resources returned by Stitch.

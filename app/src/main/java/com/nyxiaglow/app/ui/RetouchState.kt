@@ -1,4 +1,4 @@
-package com.nyxaiglow.app.ui
+package com.nyxiaglow.app.ui
 
 data class RetouchState(
     val preserveTexture: Boolean = true,

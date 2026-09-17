@@ -1,4 +1,4 @@
-package com.nyxaiglow.app.camera
+package com.nyxiaglow.app.camera
 
 import kotlin.math.abs
 

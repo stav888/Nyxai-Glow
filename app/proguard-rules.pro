@@ -13,6 +13,6 @@
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
 
--keepclassmembers class com.nyxaiglow.app.** {
+-keepclassmembers class com.nyxiaglow.app.** {
 	<init>(...);
 }

@@ -1,4 +1,4 @@
-package com.nyxaiglow.app.camera
+package com.nyxiaglow.app.camera
 
 fun lightingState(ambient: Float): String = when {
     ambient < 0.2f -> "Low light - glow boosted"

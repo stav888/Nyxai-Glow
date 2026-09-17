@@ -1,7 +1,7 @@
-package com.nyxaiglow.app.camera
+package com.nyxiaglow.app.camera
 
-import com.nyxaiglow.app.ui.RetouchState
-import com.nyxaiglow.app.ui.retouchApplyMessage
+import com.nyxiaglow.app.ui.RetouchState
+import com.nyxiaglow.app.ui.retouchApplyMessage
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

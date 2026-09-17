@@ -10,9 +10,9 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="Nyxai Glow"
+        android:label="Nyxia Glow"
         android:supportsRtl="true"
-        android:theme="@style/Theme.NyxaiGlow">
+        android:theme="@style/Theme.NyxiaGlow">
         <activity
             android:name=".MainActivity"
             android:exported="true"

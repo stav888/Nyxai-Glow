@@ -1,4 +1,4 @@
-package com.nyxaiglow.app
+package com.nyxiaglow.app
 
 import android.Manifest
 import android.content.ContentValues
@@ -86,14 +86,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.nyxaiglow.app.camera.FaceLandmarkAnalyzer
-import com.nyxaiglow.app.camera.BeautyCameraRenderer
-import com.nyxaiglow.app.camera.MakeupMaskGenerator
-import com.nyxaiglow.app.camera.lightingState
-import com.nyxaiglow.app.ui.RetouchScreen
-import com.nyxaiglow.app.ui.RetouchState
-import com.nyxaiglow.app.ui.retouchApplyMessage
-import com.nyxaiglow.app.ui.theme.NyxaiGlowTheme
+import com.nyxiaglow.app.camera.FaceLandmarkAnalyzer
+import com.nyxiaglow.app.camera.BeautyCameraRenderer
+import com.nyxiaglow.app.camera.MakeupMaskGenerator
+import com.nyxiaglow.app.camera.lightingState
+import com.nyxiaglow.app.ui.RetouchScreen
+import com.nyxiaglow.app.ui.RetouchState
+import com.nyxiaglow.app.ui.retouchApplyMessage
+import com.nyxiaglow.app.ui.theme.NyxiaGlowTheme
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -110,12 +110,12 @@ private val SurfaceRaised = Color(0xFF242020)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { NyxaiGlowTheme { NyxaiGlowApp() } }
+        setContent { NyxiaGlowTheme { NyxiaGlowApp() } }
     }
 }
 
 @Composable
-private fun NyxaiGlowApp() {
+private fun NyxiaGlowApp() {
     val context = LocalContext.current
     var cameraGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
@@ -276,7 +276,7 @@ private fun TopBar(flashOn: Boolean, flashAvailable: Boolean, onFlash: () -> Uni
         Row(verticalAlignment = Alignment.CenterVertically) {
             AuraLogo(Modifier.size(34.dp))
             Spacer(Modifier.width(9.dp))
-            Text("NYXAI-GLOW", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Text("NYXIA-GLOW", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(if (activeTab == "Retouch") "Retouch Looks" else "Camera", color = Color.White.copy(alpha = .82f), fontSize = 11.sp)
@@ -417,7 +417,7 @@ private fun PermissionPrompt(onRequest: () -> Unit) {
             Spacer(Modifier.height(20.dp))
             Text("Camera access brings the glow to life", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-            Text("Nyxai Glow needs your camera for the live beauty preview.", color = Color(0xFF595F65), fontSize = 14.sp)
+            Text("Nyxia Glow needs your camera for the live beauty preview.", color = Color(0xFF595F65), fontSize = 14.sp)
             Spacer(Modifier.height(22.dp))
             Button(onClick = onRequest, colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = CoralDeep)) { Text("Enable camera") }
         }
@@ -616,10 +616,10 @@ private fun CameraPreview(
             return@LaunchedEffect
         }
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "NyxaiGlow_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.Images.Media.DISPLAY_NAME, "NyxiaGlow_${System.currentTimeMillis()}.jpg")
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Nyxai Glow")
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Nyxia Glow")
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
         }

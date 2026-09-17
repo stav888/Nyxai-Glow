@@ -1,4 +1,4 @@
-package com.nyxaiglow.app.camera
+package com.nyxiaglow.app.camera
 
 import android.content.Context
 import android.graphics.Color
@@ -12,7 +12,7 @@ import android.util.Log
 import android.util.Size
 import android.view.Surface
 import androidx.camera.core.SurfaceRequest
-import com.nyxaiglow.app.R
+import com.nyxiaglow.app.R
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -150,7 +150,7 @@ class BeautyCameraRenderer(
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, makeupTextureId)
         try {
             GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
-            if (!hasLoggedMaskUpload && com.nyxaiglow.app.BuildConfig.DEBUG) {
+            if (!hasLoggedMaskUpload && com.nyxiaglow.app.BuildConfig.DEBUG) {
                 hasLoggedMaskUpload = true
                 Log.d("BeautyCameraRenderer", "Makeup mask texture uploaded")
             }

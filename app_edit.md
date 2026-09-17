@@ -1,8 +1,8 @@
-# Nyxai Glow App Reference
+# Nyxia Glow App Reference
 
 ## 1. Overview
 
-Nyxai Glow is a native Android beauty-camera studio built with Kotlin, Jetpack Compose, CameraX, and MediaPipe Tasks Vision. The app opens directly into a portrait camera experience after the required permissions are granted.
+Nyxia Glow is a native Android beauty-camera studio built with Kotlin, Jetpack Compose, CameraX, and MediaPipe Tasks Vision. The app opens directly into a portrait camera experience after the required permissions are granted.
 
 The current implementation provides:
 
@@ -25,20 +25,20 @@ The current implementation does not yet apply a real beauty filter, TFLite smoot
 ## 2. Repository Structure
 
 ```text
-Nyxai-Glow/
+Nyxia-Glow/
   app/
     src/main/
       AndroidManifest.xml
       assets/
         face_landmarker.task
-      java/com/nyxaiglow/app/
+      java/com/nyxiaglow/app/
         MainActivity.kt
         camera/
           FaceLandmarkAnalyzer.kt
           LightingState.kt
       res/values/
         styles.xml
-    src/test/java/com/nyxaiglow/app/camera/
+    src/test/java/com/nyxiaglow/app/camera/
       LightingStateTest.kt
     build.gradle.kts
   .github/workflows/android.yml
@@ -57,8 +57,8 @@ Nyxai-Glow/
 
 The module is an Android application with:
 
-- Namespace: `com.nyxaiglow.app`
-- Application ID: `com.nyxaiglow.app`
+- Namespace: `com.nyxiaglow.app`
+- Application ID: `com.nyxiaglow.app`
 - Minimum SDK: 26, Android 8.0
 - Target SDK: 35
 - Compile SDK: 35
@@ -134,16 +134,16 @@ app/build/outputs/apk/debug/app-debug.apk
 ```powershell
 adb devices
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n com.nyxaiglow.app/.MainActivity
+adb shell am start -n com.nyxiaglow.app/.MainActivity
 ```
 
 To inspect runtime errors:
 
 ```powershell
 adb logcat -c
-adb shell am force-stop com.nyxaiglow.app
-adb shell am start -n com.nyxaiglow.app/.MainActivity
-adb logcat -d | Select-String "FATAL EXCEPTION|AndroidRuntime|com.nyxaiglow.app"
+adb shell am force-stop com.nyxiaglow.app
+adb shell am start -n com.nyxiaglow.app/.MainActivity
+adb logcat -d | Select-String "FATAL EXCEPTION|AndroidRuntime|com.nyxiaglow.app"
 ```
 
 ## 6. Automated Validation
@@ -163,9 +163,9 @@ The current JVM test covers the boundary behavior of semantic lighting labels in
 
 ## 7. Application Entry Flow
 
-`MainActivity` creates the Compose content and applies `NyxaiGlowTheme`.
+`MainActivity` creates the Compose content and applies `NyxiaGlowTheme`.
 
-`NyxaiGlowApp` owns permission state:
+`NyxiaGlowApp` owns permission state:
 
 1. It checks camera permission.
 2. It shows `PermissionPrompt` until camera permission is granted.
@@ -342,7 +342,7 @@ Gallery actions launch Android's `GetContent` picker for `image/*`. The selected
 
 The shutter uses CameraX `ImageCapture` and MediaStore:
 
-- Android 10+: stores under `Pictures/Nyxai Glow` using `RELATIVE_PATH` and `IS_PENDING`.
+- Android 10+: stores under `Pictures/Nyxia Glow` using `RELATIVE_PATH` and `IS_PENDING`.
 - Android 8/9: uses MediaStore with the legacy storage permission.
 - Android 8/9 requests the legacy permission only for the capture action.
 - A unique timestamped JPEG name is generated.

@@ -1,4 +1,4 @@
-package com.nyxaiglow.app.ui
+package com.nyxiaglow.app.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -38,6 +38,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -96,7 +100,12 @@ fun RetouchScreen(
                     Surface(
                         color = if (item == selectedPreset) Coral else SurfaceRaised,
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.clickable { onPresetSelected(item) }
+                        modifier = Modifier
+                            .clickable(role = Role.Button) { onPresetSelected(item) }
+                            .semantics {
+                                selected = item == selectedPreset
+                                stateDescription = if (item == selectedPreset) "Selected" else "Not selected"
+                            }
                     ) {
                         Column(Modifier.width(58.dp).padding(7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(if (item == selectedPreset) CoralDeep else Color(0xFF3B3331)))
@@ -112,9 +121,21 @@ fun RetouchScreen(
                 value = smoothingIntensity,
                 onValueChange = onSmoothingChange,
                 valueRange = 0f..1f,
+                modifier = Modifier.semantics {
+                    stateDescription = "Smoothing intensity ${(smoothingIntensity * 100).toInt()} percent"
+                },
                 colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Coral, activeTrackColor = Coral, inactiveTrackColor = SurfaceRaised)
             )
-            Surface(color = SurfaceRaised, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onTextureToggle)) {
+            Surface(
+                color = SurfaceRaised,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(role = Role.Switch, onClick = onTextureToggle)
+                    .semantics {
+                        stateDescription = if (preserveTexture) "On" else "Off"
+                    }
+            ) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text("Subtle Micro-Texture", color = Color.White, fontSize = 12.sp)
@@ -137,7 +158,15 @@ fun RetouchScreen(
 
 @Composable
 private fun RetouchTool(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick)) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics {
+                this.selected = selected
+                stateDescription = if (selected) "Selected" else "Not selected"
+            }
+    ) {
         Surface(color = if (selected) Coral.copy(alpha = .2f) else SurfaceRaised, shape = CircleShape, modifier = Modifier.size(42.dp)) {
             Icon(icon, label, tint = if (selected) Coral else Color.White.copy(alpha = .72f), modifier = Modifier.padding(12.dp))
         }
