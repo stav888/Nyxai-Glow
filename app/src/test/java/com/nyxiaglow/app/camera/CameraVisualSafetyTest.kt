@@ -4,6 +4,7 @@ import com.nyxiaglow.app.ui.RetouchState
 import com.nyxiaglow.app.ui.retouchApplyMessage
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -48,8 +49,34 @@ class CameraVisualSafetyTest {
         val previous = floatArrayOf(.2f, .3f, .4f, .5f)
         val unchanged = floatArrayOf(.202f, .298f, .4f, .5f)
         val changed = floatArrayOf(.204f, .3f, .4f, .5f)
-        assertTrue(!LandmarkChangeDetector.changed(previous, unchanged))
+        assertFalse(LandmarkChangeDetector.changed(previous, unchanged))
         assertTrue(LandmarkChangeDetector.changed(previous, changed))
+    }
+
+    @Test
+    fun landmarkChangeAtExactThresholdCountsAsChanged() {
+        val previous = floatArrayOf(.2f, .3f)
+        val current = floatArrayOf(.203f, .3f)
+
+        assertTrue(LandmarkChangeDetector.changed(previous, current))
+    }
+
+    @Test
+    fun manySmallLandmarkChangesBelowThresholdAreIgnored() {
+        val previous = FloatArray(956) { .5f }
+        val current = FloatArray(956) { .502f }
+
+        assertFalse(LandmarkChangeDetector.changed(previous, current))
+    }
+
+    @Test
+    fun differentLandmarkArraySizesRequireUpdate() {
+        assertTrue(
+            LandmarkChangeDetector.changed(
+                floatArrayOf(.2f),
+                floatArrayOf(.2f, .3f)
+            )
+        )
     }
 
     @Test
